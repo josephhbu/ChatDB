@@ -21,3 +21,5 @@ def detect_intent(user_input):
 user_input = "Show the total sales by product type"
 intent = detect_intent(user_input)
 print(intent)  # Output: "group_by"
+
+### This is a test for local git
