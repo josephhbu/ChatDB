@@ -1,20 +1,23 @@
 import pandas as pd
 import mysql.connector
 from sqlalchemy import create_engine
+from sqlalchemy.sql import text
 
-MYSQL_USER = 'user'
-MYSQL_PASSWORD = 'Dsci-551'
-MYSQL_HOST = 'localhost'
+# MySQL connection details
+MYSQL_USER = 'root'  # Default MySQL user created by Homebrew
+MYSQL_PASSWORD = ''  # No password set
+MYSQL_HOST = 'localhost'  # Default host
 DATABASE_NAME = 'coffee_shop_sales'
 
-#FILE_PATH = 'your_file.csv'
+# Path to the data file
+FILE_PATH = 'coffee_shop_sales.csv'
 
-#Create new mysql db
+# Create a new MySQL database
 def create_database(cursor, db):
     cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db};")
     cursor.execute(f"USE {db};")
 
-#Load file into df
+# Load the data file into a pandas DataFrame
 def load_file(file_path):
     if file_path.endswith('.csv') or file_path.endswith('.txt'):
         return pd.read_csv(file_path)
@@ -23,7 +26,7 @@ def load_file(file_path):
     else:
         raise ValueError("Unsupported file type.")
 
-#Create table in mysql based on df columns
+# Create a table in MySQL based on the DataFrame columns
 def create_table_from_dataframe(df, table_name, engine):
     column_types = []
     for column in df.columns:
@@ -34,17 +37,17 @@ def create_table_from_dataframe(df, table_name, engine):
         elif df[column].dtype == 'float64':
             column_types.append(f"`{column}` FLOAT")
         else:
-            column_types.append(f"`{column}` VARCHAR(50)")
+            column_types.append(f"`{column}` VARCHAR(50)") 
 
     create_table_query = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(column_types)});"
     with engine.connect() as connection:
-        connection.execute(create_table_query)
+        connection.execute(text(create_table_query))  # Use text() to wrap the raw SQL string
 
-#Insert df into mysql
+# Insert DataFrame into MySQL
 def insert_dataframe_into_mysql(df, table_name, engine):
     df.to_sql(table_name, con=engine, if_exists='append', index=False)
 
-
+# Main implementation
 def implement():
     # Connect to MySQL
     mydb = mysql.connector.connect(
@@ -76,3 +79,4 @@ def implement():
 
 if __name__ == "__main__":
     implement()
+
