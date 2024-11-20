@@ -44,7 +44,7 @@ def create_table_from_dataframe(df, table_name, engine):
 def insert_dataframe_into_mysql(df, table_name, engine):
     df.to_sql(table_name, con=engine, if_exists='append', index=False)
 
-# Main function - chatgpt did this part for me
+
 def implement():
     # Connect to MySQL
     mydb = mysql.connector.connect(

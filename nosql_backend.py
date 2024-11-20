@@ -14,17 +14,21 @@ def import_multiple_json_to_mongodb(json_files, db_name):
             collection_name = os.path.splitext(os.path.basename(json_file))[0]
             collection = db[collection_name]
 
+            # Open and read the JSON file line by line
             with open(json_file, 'r') as file:
-                data = json.load(file)
+                data = []
+                for line in file:
+                    line = line.strip() 
+                    if line:  
+                        try:
+                            json_object = json.loads(line)
+                            data.append(json_object)
+                        except json.JSONDecodeError as e:
+                            print(f"Error decoding JSON in {json_file}: {e}")
+                            continue
 
-            # Ensure data format is correct
-            if isinstance(data, list):
-                collection.insert_many(data)  # Insert a list of documents
-            elif isinstance(data, dict):
-                collection.insert_one(data)  # Insert a single document
-            else:
-                print(f"Unsupported JSON format in file {json_file}: {type(data)}")
-                continue
+                if data:
+                    collection.insert_many(data) 
 
             print(f"Data from {json_file} successfully imported into {db_name}.{collection_name}")
 
@@ -33,7 +37,7 @@ def import_multiple_json_to_mongodb(json_files, db_name):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python import_multiple_json_to_mongodb.py <db_name> <json_file1> [<json_file2> ... <json_fileN>]")
+        print("Usage: python nosql_backend.py <db_name> <json_file1> [<json_file2> ... <json_fileN>]")
         sys.exit(1)
 
     db_name = sys.argv[1]
