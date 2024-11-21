@@ -10,25 +10,27 @@ def import_multiple_json_to_mongodb(json_files, db_name):
         db = client[db_name]
 
         for json_file in json_files:
-            # Use the filename as the collection name
+            # Use the filename as the collection name (without extension)
             collection_name = os.path.splitext(os.path.basename(json_file))[0]
             collection = db[collection_name]
 
-            # Open and read the JSON file line by line
+            # Open and read the JSON file
             with open(json_file, 'r') as file:
-                data = []
-                for line in file:
-                    line = line.strip() 
-                    if line:  
-                        try:
-                            json_object = json.loads(line)
-                            data.append(json_object)
-                        except json.JSONDecodeError as e:
-                            print(f"Error decoding JSON in {json_file}: {e}")
-                            continue
+                try:
+                    # Check if it's a JSON array
+                    data = json.load(file)
+                    if isinstance(data, dict):  # If it's a single JSON object
+                        data = [data]
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON in {json_file}: {e}")
+                    continue
 
-                if data:
-                    collection.insert_many(data) 
+            # Insert data into the collection
+            if data:
+                if isinstance(data, list):
+                    collection.insert_many(data)  # Insert list of documents
+                else:
+                    collection.insert_one(data)  # Insert single document
 
             print(f"Data from {json_file} successfully imported into {db_name}.{collection_name}")
 
