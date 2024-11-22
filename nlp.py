@@ -11,9 +11,22 @@ def run_mongo_query(query, db_name):
 
 # Function to run a SQL query
 def run_sql_query(query, engine):
-    with engine.connect() as connection:
-        result = connection.execute(text(query))
-        return result.fetchall()
+    # with engine.connect() as connection:
+    #     result = connection.execute(text(query))
+    #     return result.fetchall()
+    cursor = engine.cursor()
+    res = []
+    try:
+        cursor.execute(query)
+    
+        res = cursor.fetchall()
+    except:
+        print('Run query error!')
+    finally:
+        cursor.close()
+        return res
+        # engine.close()
+    
 
 # Steps:
 # 1. Extract Parameters Dynamically: Use regex to extract parameters from the natural language input.
@@ -21,65 +34,111 @@ def run_sql_query(query, engine):
 # 3. Generate Queries Dynamically: Once parameters are extracted, use them to generate the query using the pattern's template depending on the database chosen (MongoDB or SQL).
 
 # Function to detect the intent of the user input
-def detect_intent(user_input):
-    if re.search(r'total.*by.*', user_input.lower()):
-        return "group_by"
-    elif re.search(r'find.*where.*', user_input.lower()):
-        return "filter_sort"
-    elif re.search(r'count.*by.*', user_input.lower()):
-        return "count_by_category"
-    elif re.search(r'average.*of.*', user_input.lower()):
-        return "average_by_category"
-    elif re.search(r'show.*from.*to.*', user_input.lower()):
-        return "filter_by_date_range"
-    elif re.search(r'top.*where.*', user_input.lower()):
-        return "top_n_by_measure"
-    elif re.search(r'join.*on.*', user_input.lower()):
-        return "join_query"
-    elif re.search(r'get.*from.*', user_input.lower()):
-        return "basic_select"
-    elif re.search(r'insert.*into.*', user_input.lower()):
-        return "insert_query"
-    elif re.search(r'update.*set.*', user_input.lower()):
-        return "update_query"
-    elif re.search(r'delete.*from.*', user_input.lower()):
-        return "delete_query"
-    elif re.search(r'list.*tables', user_input.lower()):
-        return "list_tables"
-    elif re.search(r'list.*collections', user_input.lower()):
-        return "list_collections"
-    else:
-        return "unknown"
+def process_user_input_sql(user_input, intent, engine):
 
-# Extract parameters dynamically from the natural language query
-def extract_params(nl_query, pattern):
-    # Convert the query pattern to a regex with named groups
-    regex = pattern.replace("{", "(?P<").replace("}", ">.*?)")
-    match = re.match(regex, nl_query)
-    return match.groupdict() if match else None
+    result = []
+    if intent == 'basic_select':
+        pattern = "get me {table} where {columns} is {condition}"
+        params = extract_params(user_input, pattern)
+        if params:
+            query = generator.generate_query(
+                "basic_select",
+                table=params["table"],
+                condition=params["condition"],
+                columns=params["columns"]
+            )
+            print("Generated Basic Select Query:", query)
+            result = run_sql_query(query, engine)  # Run SQL query
 
-# Main function for processing the user input
-def process_user_input(user_input, selected_db):
-    # Step 1: Detect intent
-    intent = detect_intent(user_input)
+    elif intent == "join_query":
+        # pattern = "join_query {columns} from {table1} join {table2} on {join_column} where {condition}"
+        pattern = "show {table1} which has {table2} that the {columns} is {condition}"
+        
+        
+        params = extract_params(user_input, pattern)
+        
+        cursor = engine.cursor()
+        cursor.execute(f"DESC {params['table1']}")
+        
+        columnsOf1 =  [column[0] for column in cursor.fetchall()]
+        cursor.execute(f"DESC {params['table2']}")
+        columnsOf2 =  [column[0] for column in cursor.fetchall()]
+        id_fields1 = [column for column in columnsOf1 if 'id' in column.lower()]
+        id_fields2 = [column for column in columnsOf2 if 'id' in column.lower()]
+        cursor.close()
+        
+        if params:
+            query = generator.generate_query(
+                "join_query",
+                table1=params["table1"],
+                table2=params["table2"],
+                join_column1=id_fields1[0],
+                join_column2=id_fields2[0],
+                condition=params["condition"],
+                columns=params["columns"]
+            )
+            print("Generated Join Query:", query)
+            result =run_sql_query(query, engine)
 
+    elif intent == "group_by":
+        pattern = "total {measure} by {category} from {table}"
+        params = extract_params(user_input, pattern)
+        if params:
+            query = generator.generate_query(
+                "total_by_category",
+                category=params["category"],
+                measure=params["measure"],
+                table=params["table"]
+            )
+            result = run_sql_query(query)  # Run SQL query
+            print("Generated and Executed SQL Group By Query:", query)
+            print("SQL Query Result:", result)
+
+    elif intent == "filter_sort":
+        pattern = "find {columns} from {table} where {condition} order by {sort_column} {sort_order}"
+        params = extract_params(user_input, pattern)
+        if params:
+            query = generator.generate_query(
+                "filter_and_sort",
+                table=params["table"],
+                condition=params["condition"],
+                sort_column=params["sort_column"],
+                sort_order=params["sort_order"]
+            )
+            result = run_sql_query(query)  # Run SQL query
+            print("Generated and Executed SQL Filter Sort By Query:", query)
+            print("SQL Query Result:", result)
+
+    elif intent == "count_by_category":
+        pattern = "count {table} by {category}"
+        params = extract_params(user_input, pattern)
+        if params:
+            query = generator.generate_query(
+                "count_by_category",
+                category=params["category"],
+                table=params["table"]
+            )
+            result = run_sql_query(query, engine)  # Run SQL query
+            print("Generated and Executed SQL Count By Query:", query)
+            print("SQL Query Result:", result)
+
+    elif intent == "list_tables":
+        query = generator.generate_query("list_tables")
+        result = run_sql_query(query, engine)
+        print("Generated List Tables Query:", query)
+        print("SQL Query Result:", result)
+        
+    return result
+
+def process_user_input_mongodb(user_input, intent, engine):
+    result = []
     if intent == "join_query":
         # Extract parameters for a join query
         pattern = "join_query {columns} from {table1} join {table2} on {join_column} where {condition}"
         params = extract_params(user_input, pattern)
 
         if params:
-            # Generate query based on the selected database (SQL or MongoDB)
-            if selected_db == 'SQL':
-                query = generator.generate_query(
-                    "join_query",
-                    table1=params["table1"],
-                    table2=params["table2"],
-                    join_column=params["join_column"],
-                    condition=params["condition"],
-                    columns=params["columns"]
-                )
-            elif selected_db == 'MongoDB':
+            if db_type == 'MongoDB':
                 query = generator.generate_query(
                     "mongo_lookup",
                     table1=params["table1"],
@@ -89,9 +148,9 @@ def process_user_input(user_input, selected_db):
                     join_as=params["columns"],
                     condition=params["condition"]
                 )
-            print("Generated Join Query:", query)
-        else:
-            print(f"Unable to extract parameters from: {user_input}")
+                print("Generated Join Query (MongoDB):", query)
+            else:
+                print(f"Unable to extract parameters from: {user_input}")
 
     elif intent == "group_by":
         # Extract parameters for a 'total_by_category' query
@@ -99,18 +158,7 @@ def process_user_input(user_input, selected_db):
         params = extract_params(user_input, pattern)
 
         if params:
-            # Generate the query for "group_by"
-            if selected_db == 'SQL':
-                query = generator.generate_query(
-                    "total_by_category",
-                    category=params["category"],
-                    measure=params["measure"],
-                    table=params["table"]
-                )
-                result = run_sql_query(query)  # Run SQL query
-                print("Generated and Executed SQL Group By Query:", query)
-                print("SQL Query Result:", result)
-            elif selected_db == 'MongoDB':
+            if db_type == 'MongoDB':
                 query = generator.generate_query(
                     "mongo_group_sum",
                     category=params["category"],
@@ -126,19 +174,7 @@ def process_user_input(user_input, selected_db):
         params = extract_params(user_input, pattern)
 
         if params:
-            # Generate the filter and sort query
-            if selected_db == 'SQL':
-                query = generator.generate_query(
-                    "filter_and_sort",
-                    table=params["table"],
-                    condition=params["condition"],
-                    sort_column=params["sort_column"],
-                    sort_order=params["sort_order"]
-                )
-                result = run_sql_query(query)  # Run SQL query
-                print("Generated and Executed SQL Filter Sort By Query:", query)
-                print("SQL Query Result:", result)
-            elif selected_db == 'MongoDB':
+            if db_type == 'MongoDB':
                 query = generator.generate_query(
                     "mongo_filter_and_sort",
                     condition=params["condition"],
@@ -155,18 +191,7 @@ def process_user_input(user_input, selected_db):
         params = extract_params(user_input, pattern)
 
         if params:
-            # Generate count query based on selected database
-            if selected_db == 'SQL':
-                query = generator.generate_query(
-                    "count_by_category",
-                    category=params["category"],
-                    measure=params["measure"],
-                    table=params["table"]
-                )
-                result = run_sql_query(query)  # Run SQL query
-                print("Generated and Executed SQL Count By Query:", query)
-                print("SQL Query Result:", result)
-            elif selected_db == 'MongoDB':
+            if db_type == 'MongoDB':
                 query = generator.generate_query(
                     "mongo_count_by_category",
                     category=params["category"]
@@ -181,18 +206,7 @@ def process_user_input(user_input, selected_db):
         params = extract_params(user_input, pattern)
 
         if params:
-            # Generate insert query
-            if selected_db == 'SQL':
-                query = generator.generate_query(
-                    "insert_query",
-                    table=params["table"],
-                    columns=params["columns"],
-                    values=params["values"]
-                )
-                result = run_sql_query(query)  # Run SQL query
-                print("Generated and Executed SQL Insert Query:", query)
-                print("SQL Query Result:", result)
-            elif selected_db == 'MongoDB':
+            if db_type == 'MongoDB':
                 query = generator.generate_query(
                     "mongo_insert_query",
                     table=params["table"],
@@ -208,18 +222,7 @@ def process_user_input(user_input, selected_db):
         params = extract_params(user_input, pattern)
 
         if params:
-            # Generate update query
-            if selected_db == 'SQL':
-                query = generator.generate_query(
-                    "update_query",
-                    table=params["table"],
-                    columns=params["columns"],
-                    condition=params["condition"]
-                )
-                result = run_sql_query(query)  # Run SQL query
-                print("Generated and Executed SQL Update Query:", query)
-                print("SQL Query Result:", result)
-            elif selected_db == 'MongoDB':
+            if db_type == 'MongoDB':
                 query = generator.generate_query(
                     "mongo_update_query",
                     table=params["table"],
@@ -236,17 +239,7 @@ def process_user_input(user_input, selected_db):
         params = extract_params(user_input, pattern)
 
         if params:
-            # Generate delete query
-            if selected_db == 'SQL':
-                query = generator.generate_query(
-                    "delete_query",
-                    table=params["table"],
-                    condition=params["condition"]
-                )
-                result = run_sql_query(query)  # Run SQL query
-                print("Generated and Executed SQL Delete Query:", query)
-                print("SQL Query Result:", result)
-            elif selected_db == 'MongoDB':
+            if db_type == 'MongoDB':
                 query = generator.generate_query(
                     "mongo_delete_query",
                     table=params["table"],
@@ -256,22 +249,72 @@ def process_user_input(user_input, selected_db):
                 print("Generated and Executed MongoDB Delete Query:", query)
                 print("MongoDB Query Result:", result)
 
-    elif intent == "list_tables":
-        # Generate query for listing tables in SQL
-        if selected_db == 'SQL':
-            query = generator.generate_query("list_tables")
-            result = run_sql_query(query)
-            print("Generated List Tables Query:", query)
-            print("SQL Query Result:", result)
-
     elif intent == "list_collections":
         # Generate query for listing collections in MongoDB
-        if selected_db == 'MongoDB':
+        if db_type == 'MongoDB':
             query = generator.generate_query("mongo_list_collections")
             result = run_mongo_query(query)  # Run MongoDB query
             print("Generated List Collections Query:", query)
             print("MongoDB Query Result:", result)
 
+def detect_intent(user_input):
+    if re.search(r'average.*of.*', user_input.lower()):
+        return "average_by_category" #Need data cleaning
+    elif re.search(r'get.*is.*', user_input.lower()):
+        return "basic_select" #test done
+    elif re.search(r'count.*by.*', user_input.lower()):
+        return "count_by_category" #test done
+    elif re.search(r'find.*where.*', user_input.lower()):
+        return "filter_sort"
+    elif re.search(r'show.*from.*to.*', user_input.lower()):
+        return "filter_by_date_range"
+    elif re.search(r'total.*by.*', user_input.lower()):
+        return "group_by"
+    elif re.search(r'join.*on.*', user_input.lower()):
+        return "join_query" #test done
+    elif re.search(r'list.*collections', user_input.lower()):
+        return "list_collections"
+    elif re.search(r'show.*tables', user_input.lower()):
+        return "list_tables"
+    elif re.search(r'top.*where.*', user_input.lower()):
+        return "top_n_by_measure"
     else:
-        print(f"No pattern detected for input: {user_input}")
+        return "unknown"
 
+
+# Extract parameters dynamically from the natural language query
+def extract_params(nl_query, pattern):
+    # Convert the query pattern to a regex with named groups
+    regex = pattern.replace("{", "(?P<").replace("}", ">.*?)")
+    regex = regex.rstrip(".*?)") + ".*)"
+
+    match = re.match(regex, nl_query) 
+    print(nl_query)
+    print(pattern)
+    data_dict = match.groupdict()
+    if 'columns' in data_dict and data_dict['columns'] == 'all':
+        data_dict['columns'] = '*'
+    return data_dict if match else None
+
+# Main function for processing the user input
+def process_user_input(user_input, db_type, engine):
+    # Step 1: Detect intent
+    intent = detect_intent(user_input)
+        ### DEL LATER
+    intent = 'join_query'
+
+    print(intent)
+    if intent == 'unknown':
+        print("Cannot detect intention")
+        return []
+
+    data_from_db =  []
+    if db_type == 'SQL':
+        data_from_db = process_user_input_sql(user_input, intent, engine)
+    elif db_type == 'MongoDB':
+        data_from_db = process_user_input_mongodb(user_input, intent, engine)
+    else:
+        print("Invalid DB Type")
+        return []
+    
+    return data_from_db
