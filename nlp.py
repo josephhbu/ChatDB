@@ -135,7 +135,21 @@ def process_user_input_sql(user_input, intent, engine):
             result = run_sql_query(query, engine)  # Run SQL query
             print("Generated and Executed SQL Group By Query:", query)
             print("SQL Query Result:", result)
-            
+    
+    elif intent == "average_by_category":
+        pattern = r"average (?P<measure>[\w\s]+) by (?P<category>\w+) from (?P<table>\w+)"
+        params = extract_params(user_input, pattern)
+        if params:
+            query = generator.generate_query(
+                "average_by_category",
+                category=params["category"],
+                measure=params["measure"].strip().replace(" ", "_"),  # Convert multi-word measures to column format if needed
+                table=params["table"]
+            )
+            result = run_sql_query(query, engine)  # Run SQL query
+            print("Generated and Executed SQL Group By Query:", query)
+            print("SQL Query Result:", result)
+             
     elif intent == "filter_sort":
         pattern = r"find\s+(?P<columns>(?:\w+\s*,\s*)*\w+)\s+from\s+(?P<table>\w+)\s+where\s+(?P<condition>.+)\s+order\s+by\s+(?P<sort_column>\w+)\s+(?P<sort_order>asc|desc)"
         params = extract_params(user_input, pattern)
@@ -146,7 +160,6 @@ def process_user_input_sql(user_input, intent, engine):
             # Fix condition syntax (replace "is" with "=" for SQL compliance)
             
             condition  = params["condition"].replace(params["condition"].split("is ")[-1],f'\'{params["condition"].split("is ")[-1]}\'')
-            print(condition)
             condition = condition.replace(" is ", " = ")
 
             # Generate the query dynamically using the generator
@@ -182,8 +195,100 @@ def process_user_input_sql(user_input, intent, engine):
         result = run_sql_query(query, engine)
         print("Generated List Tables Query:", query)
         print("SQL Query Result:", result)
+    
+    
+    elif intent == 'top_n_by_measures':
+        query = generator.generate_query("list_tables")
+        tables = run_sql_query(query, engine)
+        tables =  [item[0].lower() for item in tables]
         
+        trim_input = user_input.replace("get me ", "").replace('get ', '')
+        tokens = trim_input.split()
+        number = tokens[0]
+        extremes = ['highest', 'lowest', 'largest', 'smallest']
+        mid = 'mid'
+        for extreme in extremes:
+            if extreme in trim_input:
+                mid = extreme
 
+        if mid in ['highest', 'largest']:
+            sort = 'DESC'
+        else:
+            sort = 'ASC'
+
+        if tokens[1] in tables:
+            table = tokens[1]
+            measure = tokens[-1]
+            print( number, table, measure, sort) 
+            print('NORMAL GET ORDER BY MEASURE')
+            query = generator.generate_query(
+                "top_n_by_measure_table",
+                measure=measure,
+                table=table,
+                n=number,
+                sort=sort
+            )
+            result = run_sql_query(query, engine)
+        else:
+           
+            later_half = trim_input.split(mid)[-1]
+
+            chosen_table = ''
+            for table in tables:
+                if table in later_half:
+                    chosen_table = table
+            measure =tokens[1]
+            if chosen_table != '':
+                print( number, chosen_table, measure, sort) 
+                print('COUNT MEASURE')
+                query = generator.generate_query(
+                    "top_n_by_measure_count",
+                    measure=measure,
+                    table=chosen_table,
+                    n=number,
+                    sort=sort
+                )
+                result = run_sql_query(query, engine)
+            else:
+                column = tokens[1].strip()
+                measure = later_half.strip().replace("number of ", "")
+                
+                for table in tables:
+                    query = 'SHOW COLUMNS FROM ' + table.upper()
+                    cols = run_sql_query(query, engine)
+                    cols = [item[0].lower() for item in cols]
+                    if column in cols  and measure in cols:
+                        chosen_table = table                            
+                        break
+                
+                print(number, column, measure, sort, chosen_table) #
+                print('select sum')
+                query = generator.generate_query(
+                    "top_n_by_measure_no_table",
+                    measure=measure,
+                    table=chosen_table,
+                    n=number,
+                    sort=sort,
+                    column=column
+                )
+                result = run_sql_query(query, engine)
+        print("Generated List Tables Query:", query)
+        print("SQL Query Result:", result)
+    elif intent == "describe_attr":
+        # Extract the table name from the user input
+        pattern = r"show\s+table\s+(?P<table>\w+)\s+attributes"
+        params = extract_params(user_input, pattern)
+
+        if not params or 'table' not in params:
+            raise ValueError("Invalid or missing table name for describe attributes intent.")
+
+        table_name = params["table"]
+
+        # Generate and execute the DESCRIBE query
+        query = f"SHOW COLUMNS FROM {table_name}"
+        print(f"Generated Describe Query: {query}")
+        result = run_sql_query(query, engine)
+        print("SQL Query Result:", result)
     return result
 
 def process_user_input_mongodb(user_input, intent, engine):
@@ -278,13 +383,20 @@ def detect_intent(user_input):
         ("basic_select", r"\b(get|show)\b.*\bwhere\b"),  # Pattern for basic select queries
         ("list_tables", r"\bshow\b.*\btables\b"),  # Pattern for listing tables
         ("list_collections", r"\blist\b.*\bcollections\b"),  # Pattern for listing collections
-        ("top_n_by_measure", r"\btop\b.*\bwhere\b.*"),  # Pattern for top N queries
+        # ("top_n_by_measure", r"\btop\b.*\bwhere\b.*"),  # Pattern for top N queries
+        ("describe_attr", r"\btable\b.*\battributes\b")
     ]
 
     # Check patterns in priority order
     for intent, pattern in intent_patterns:
         if re.search(pattern, user_input):
             return intent
+
+    extremes = ['highest', 'lowest', 'largest', 'smallest']
+    for extreme in extremes:
+        if extreme in user_input:
+            return 'top_n_by_measures'
+
 
     # Default intent if no patterns match
     return "unknown"
