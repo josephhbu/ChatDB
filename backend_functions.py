@@ -31,13 +31,13 @@ def create_table_from_dataframe(df, table_name, engine):
     column_types = []
     for column in df.columns:
         if df[column].dtype == 'object':
-            column_types.append(f"`{column}` VARCHAR(50)")
+            column_types.append(f"`{column}` VARCHAR(255)")
         elif df[column].dtype == 'int64':
             column_types.append(f"`{column}` INT")
         elif df[column].dtype == 'float64':
             column_types.append(f"`{column}` FLOAT")
         else:
-            column_types.append(f"`{column}` VARCHAR(50)") 
+            column_types.append(f"`{column}` VARCHAR(255)") 
 
     create_table_query = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(column_types)});"
     with engine.connect() as connection:
