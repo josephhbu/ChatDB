@@ -34,83 +34,138 @@ def run_sql_query(query, engine):
 # 3. Generate Queries Dynamically: Once parameters are extracted, use them to generate the query using the pattern's template depending on the database chosen (MongoDB or SQL).
 
 # Function to detect the intent of the user input
+
+
 def process_user_input_sql(user_input, intent, engine):
 
     result = []
-    if intent == 'basic_select':
-        pattern = "get me {table} where {columns} is {condition}"
+
+    if intent == "join_query": #most complicated
+        # Updated pattern for join queries
+        pattern = r"show\s+(?P<table1>\w+)\s+which\s+has\s+(?P<table2>\w+)\s+that\s+the\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>.+)"
         params = extract_params(user_input, pattern)
+        if not params or not all(k in params for k in ['table1', 'table2', 'column', 'value']):
+            raise ValueError("Invalid or missing parameters for join query.")
+
+        # Fetch column information for both tables
+        cursor = engine.cursor()
+        cursor.execute(f"DESC {params['table1']}")
+        columnsOf1 = [column[0] for column in cursor.fetchall()]
+
+        cursor.execute(f"DESC {params['table2']}")
+        columnsOf2 = [column[0] for column in cursor.fetchall()]
+        cursor.close()
+        # Identify joinable columns
+        join_column1 = next((col for col in columnsOf1 if 'id' in col.lower()), None)
+        join_column2 = next((col for col in columnsOf2 if 'id' in col.lower()), None)
+
+        if not join_column1 or not join_column2:
+            raise ValueError(f"No joinable columns found between {params['table1']} and {params['table2']}.")
+        # Generate the query
+        query = f"""
+        SELECT {params['table1']}.* 
+        FROM {params['table1']} 
+        INNER JOIN {params['table2']} 
+        ON {params['table1']}.{join_column1} = {params['table2']}.{join_column2}
+        WHERE {params['table2']}.{params['column']} = '{params['value']}'
+        """.strip()
+        print("Generated Join Query:", query)
+        # Execute the query
+        result = run_sql_query(query, engine)
+    
+    elif intent == "filter_by_date_range":
+        pattern = r"show\s+(?P<table>\w+)\s+where\s+(?P<date_column>\w+)\s+is\s+between\s+'(?P<start_date>[\d-]+)'\s+and\s+'(?P<end_date>[\d-]+)'"
+        params = extract_params(user_input, pattern)
+        
         if params:
+            # Use generator to construct the query
+            query = generator.generate_query(
+                "filter_by_date_range",
+                table=params["table"],
+                date_column=params["date_column"],
+                start_date=params["start_date"],
+                end_date=params["end_date"]
+            )
+            print(f"Generated Query: {query}")
+            result = run_sql_query(query, engine)
+            print("SQL Query Result:", result)
+
+    elif intent == 'basic_select':
+        # Flexible pattern for basic select queries
+        if " of " in user_input:
+            pattern = r"(get|show)\s+(?P<columns>[\w\s,]+)\s+of\s+(?P<table>\w+)\s*(?:where\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>[\w\s]+))?"
+        else:
+            user_input = user_input.replace(" all ", " ").replace(" every ", " ")    
+            pattern = r"(get|show)\s+(?P<table>\w+)\s*(?:where\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>\w+))?"
+        user_input = user_input.replace(" me ", " ")
+        params = extract_params(user_input, pattern)
+
+        if params:
+            # Dynamically construct the condition
+            condition = None
+            if params.get("column") and params.get("value"):
+                condition = f"{params['column']} = '{params['value']}'"
+
+
+            columns = "*"
+            
+            if 'columns' in params:
+                columns = params['columns']
+            # Generate the SQL query
             query = generator.generate_query(
                 "basic_select",
                 table=params["table"],
-                condition=params["condition"],
-                columns=params["columns"]
+                condition=condition if condition else "1=1",  # Default to no filtering
+                columns=columns
             )
             print("Generated Basic Select Query:", query)
-            result = run_sql_query(query, engine)  # Run SQL query
 
-    elif intent == "join_query":
-        # pattern = "join_query {columns} from {table1} join {table2} on {join_column} where {condition}"
-        pattern = "show {table1} which has {table2} that the {columns} is {condition}"
-        
-        
-        params = extract_params(user_input, pattern)
-        
-        cursor = engine.cursor()
-        cursor.execute(f"DESC {params['table1']}")
-        
-        columnsOf1 =  [column[0] for column in cursor.fetchall()]
-        cursor.execute(f"DESC {params['table2']}")
-        columnsOf2 =  [column[0] for column in cursor.fetchall()]
-        id_fields1 = [column for column in columnsOf1 if 'id' in column.lower()]
-        id_fields2 = [column for column in columnsOf2 if 'id' in column.lower()]
-        cursor.close()
-        
-        if params:
-            query = generator.generate_query(
-                "join_query",
-                table1=params["table1"],
-                table2=params["table2"],
-                join_column1=id_fields1[0],
-                join_column2=id_fields2[0],
-                condition=params["condition"],
-                columns=params["columns"]
-            )
-            print("Generated Join Query:", query)
-            result =run_sql_query(query, engine)
-
-    elif intent == "group_by":
-        pattern = "total {measure} by {category} from {table}"
+            # Run the query
+            result = run_sql_query(query, engine)
+    elif intent == "total_group_by":
+        pattern = r"total (?P<measure>[\w\s]+) by (?P<category>\w+) from (?P<table>\w+)"
         params = extract_params(user_input, pattern)
         if params:
             query = generator.generate_query(
                 "total_by_category",
                 category=params["category"],
-                measure=params["measure"],
+                measure=params["measure"].strip().replace(" ", "_"),  # Convert multi-word measures to column format if needed
                 table=params["table"]
             )
-            result = run_sql_query(query)  # Run SQL query
+            result = run_sql_query(query, engine)  # Run SQL query
             print("Generated and Executed SQL Group By Query:", query)
             print("SQL Query Result:", result)
-
+            
     elif intent == "filter_sort":
-        pattern = "find {columns} from {table} where {condition} order by {sort_column} {sort_order}"
+        pattern = r"find\s+(?P<columns>(?:\w+\s*,\s*)*\w+)\s+from\s+(?P<table>\w+)\s+where\s+(?P<condition>.+)\s+order\s+by\s+(?P<sort_column>\w+)\s+(?P<sort_order>asc|desc)"
         params = extract_params(user_input, pattern)
         if params:
+            # Split and clean up the column list
+            columns = ', '.join([col.strip() for col in params['columns'].split(',')])
+
+            # Fix condition syntax (replace "is" with "=" for SQL compliance)
+            
+            condition  = params["condition"].replace(params["condition"].split("is ")[-1],f'\'{params["condition"].split("is ")[-1]}\'')
+            print(condition)
+            condition = condition.replace(" is ", " = ")
+
+            # Generate the query dynamically using the generator
             query = generator.generate_query(
                 "filter_and_sort",
+                columns=columns,  # Dynamically include columns
                 table=params["table"],
-                condition=params["condition"],
+                condition=condition,
                 sort_column=params["sort_column"],
-                sort_order=params["sort_order"]
+                sort_order=params["sort_order"].upper()  # Convert sort order to uppercase for SQL compliance
             )
-            result = run_sql_query(query)  # Run SQL query
-            print("Generated and Executed SQL Filter Sort By Query:", query)
+            print(f"Generated Filter and Sort Query: {query}")
+
+            # Execute the query
+            result = run_sql_query(query, engine)
             print("SQL Query Result:", result)
 
     elif intent == "count_by_category":
-        pattern = "count {table} by {category}"
+        pattern = r"count (?P<table>\w+) by (?P<category>\w+)"
         params = extract_params(user_input, pattern)
         if params:
             query = generator.generate_query(
@@ -128,6 +183,7 @@ def process_user_input_sql(user_input, intent, engine):
         print("Generated List Tables Query:", query)
         print("SQL Query Result:", result)
         
+
     return result
 
 def process_user_input_mongodb(user_input, intent, engine):
@@ -152,7 +208,7 @@ def process_user_input_mongodb(user_input, intent, engine):
             else:
                 print(f"Unable to extract parameters from: {user_input}")
 
-    elif intent == "group_by":
+    elif intent == "total_group_by":
         # Extract parameters for a 'total_by_category' query
         pattern = "total {measure} by {category} from {table}"
         params = extract_params(user_input, pattern)
@@ -200,55 +256,6 @@ def process_user_input_mongodb(user_input, intent, engine):
                 print("Generated and Executed MongoDB Count By Query:", query)
                 print("MongoDB Query Result:", result)
 
-    elif intent == "insert_query":
-        # Extract parameters for insert query
-        pattern = "insert into {table} ({columns}) values ({values})"
-        params = extract_params(user_input, pattern)
-
-        if params:
-            if db_type == 'MongoDB':
-                query = generator.generate_query(
-                    "mongo_insert_query",
-                    table=params["table"],
-                    values=params["values"]
-                )
-                result = run_mongo_query(query)  # Run MongoDB query
-                print("Generated and Executed MongoDB Insert Query:", query)
-                print("MongoDB Query Result:", result)
-
-    elif intent == "update_query":
-        # Extract parameters for update query
-        pattern = "update {table} set {columns} where {condition}"
-        params = extract_params(user_input, pattern)
-
-        if params:
-            if db_type == 'MongoDB':
-                query = generator.generate_query(
-                    "mongo_update_query",
-                    table=params["table"],
-                    columns=params["columns"],
-                    condition=params["condition"]
-                )
-                result = run_mongo_query(query)  # Run MongoDB query
-                print("Generated and Executed MongoDB Update Query:", query)
-                print("MongoDB Query Result:", result)
-
-    elif intent == "delete_query":
-        # Extract parameters for delete query
-        pattern = "delete from {table} where {condition}"
-        params = extract_params(user_input, pattern)
-
-        if params:
-            if db_type == 'MongoDB':
-                query = generator.generate_query(
-                    "mongo_delete_query",
-                    table=params["table"],
-                    condition=params["condition"]
-                )
-                result = run_mongo_query(query)  # Run MongoDB query
-                print("Generated and Executed MongoDB Delete Query:", query)
-                print("MongoDB Query Result:", result)
-
     elif intent == "list_collections":
         # Generate query for listing collections in MongoDB
         if db_type == 'MongoDB':
@@ -258,51 +265,83 @@ def process_user_input_mongodb(user_input, intent, engine):
             print("MongoDB Query Result:", result)
 
 def detect_intent(user_input):
-    if re.search(r'average.*of.*', user_input.lower()):
-        return "average_by_category" #Need data cleaning
-    elif re.search(r'get.*is.*', user_input.lower()):
-        return "basic_select" #test done
-    elif re.search(r'count.*by.*', user_input.lower()):
-        return "count_by_category" #test done
-    elif re.search(r'find.*where.*', user_input.lower()):
-        return "filter_sort"
-    elif re.search(r'show.*from.*to.*', user_input.lower()):
-        return "filter_by_date_range"
-    elif re.search(r'total.*by.*', user_input.lower()):
-        return "group_by"
-    elif re.search(r'join.*on.*', user_input.lower()):
-        return "join_query" #test done
-    elif re.search(r'list.*collections', user_input.lower()):
-        return "list_collections"
-    elif re.search(r'show.*tables', user_input.lower()):
-        return "list_tables"
-    elif re.search(r'top.*where.*', user_input.lower()):
-        return "top_n_by_measure"
-    else:
-        return "unknown"
+    user_input = user_input.lower().strip()
+
+    # Define intent patterns with priorities
+    intent_patterns = [
+        ("join_query", r"\b(show|get)\b\s+(?P<table1>\w+)\s+\bwhich has\b\s+(?P<table2>\w+)\s+\bthat the\b\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>\w+)"),  # Specific pattern for join queries
+        ("total_group_by", r"\btotal\b.*\bby\b.*"),  # Pattern for group by queries
+        ("filter_sort", r"\bfind\b.*\bwhere\b.*\border by\b.*"),  # Pattern for filter and sort queries
+        ("count_by_category", r"\bcount\b.*\bby\b.*"),  # Pattern for count by category
+        ("average_by_category", r"\baverage\b|\bmean\b.*\bof\b.*"),  # Pattern for average by category
+        ("filter_by_date_range", r"\bshow\b.*\bfrom\b.*\bto\b.*"),  # Pattern for date range filters
+        ("basic_select", r"\b(get|show)\b.*\bwhere\b"),  # Pattern for basic select queries
+        ("list_tables", r"\bshow\b.*\btables\b"),  # Pattern for listing tables
+        ("list_collections", r"\blist\b.*\bcollections\b"),  # Pattern for listing collections
+        ("top_n_by_measure", r"\btop\b.*\bwhere\b.*"),  # Pattern for top N queries
+    ]
+
+    # Check patterns in priority order
+    for intent, pattern in intent_patterns:
+        if re.search(pattern, user_input):
+            return intent
+
+    # Default intent if no patterns match
+    return "unknown"
+
+
+
 
 
 # Extract parameters dynamically from the natural language query
 def extract_params(nl_query, pattern):
-    # Convert the query pattern to a regex with named groups
-    regex = pattern.replace("{", "(?P<").replace("}", ">.*?)")
-    regex = regex.rstrip(".*?)") + ".*)"
+    """
+    Extract parameters dynamically from a natural language query based on the provided pattern.
+    
+    Args:
+        nl_query (str): The natural language query input from the user.
+        pattern (str): The regex pattern to match and extract parameters.
+    
+    Returns:
+        dict: A dictionary of extracted parameters or None if no match is found.
+    """
+    try:
+        # Convert the natural language pattern into a regex pattern
+        regex = re.compile(pattern, re.IGNORECASE)  # Case-insensitive matching
+        print(f"Using Regex Pattern: {regex}")
+        # Attempt to match the regex pattern to the user query
+        match = regex.match(nl_query.strip())
+        
+        if not match:
+            print(f"Could not extract parameters from: '{nl_query}'")
+            print(f"Tokenized input for debugging: {nl_query.split()}")
+            return None
 
-    match = re.match(regex, nl_query) 
-    print(nl_query)
-    print(pattern)
-    data_dict = match.groupdict()
-    if 'columns' in data_dict and data_dict['columns'] == 'all':
-        data_dict['columns'] = '*'
-    return data_dict if match else None
+        # Extract parameters into a dictionary
+        data_dict = match.groupdict()
+        print(f"Extracted Parameters: {data_dict}")
+
+        # Adjust special cases for 'columns'
+        if 'columns' in data_dict and data_dict['columns'].strip().lower() in ['all', '*']:
+            data_dict['columns'] = '*'
+        
+        if data_dict['table'][-1] == 's':
+            data_dict['table'] = data_dict['table'][0:-1]
+        
+        return data_dict
+
+    except re.error as re_err:
+        print(f"Regex error: {re_err}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred in extract_params: {e}")
+        return None
+
 
 # Main function for processing the user input
 def process_user_input(user_input, db_type, engine):
     # Step 1: Detect intent
     intent = detect_intent(user_input)
-        ### DEL LATER
-    intent = 'join_query'
-
     print(intent)
     if intent == 'unknown':
         print("Cannot detect intention")
@@ -318,3 +357,5 @@ def process_user_input(user_input, db_type, engine):
         return []
     
     return data_from_db
+
+

@@ -5,9 +5,9 @@ sql_query_patterns = [
         "description": "Total {measure} by {category}"
     },
     {
-        "name": "filter_and_sort",
-        "sql": "SELECT * FROM {table} WHERE {condition} ORDER BY {sort_column} {sort_order}",
-        "description": "Filter {table} by {condition} and sort by {sort_column}"
+    "name": "filter_and_sort",
+    "sql": "SELECT {columns} FROM {table} WHERE {condition} ORDER BY {sort_column} {sort_order}",
+    "description": "Filter {table} by {condition} and sort by {sort_column}, selecting specific columns"
     },
     {
         "name": "count_by_category",
@@ -21,7 +21,7 @@ sql_query_patterns = [
     },
     {
         "name": "filter_by_date_range",
-        "sql": "SELECT * FROM {table} WHERE {date_column} BETWEEN '{start_date}' AND '{end_date}'",
+        "sql": "SELECT * FROM {table} WHERE STR_TO_DATE({date_column}, '%Y-%m-%d') BETWEEN STR_TO_DATE('{start_date}', '%Y-%m-%d') AND STR_TO_DATE('{end_date}', '%Y-%m-%d')",
         "description": "Filter {table} by date range between {start_date} and {end_date}"
     },
     {
@@ -29,14 +29,15 @@ sql_query_patterns = [
         "sql": "SELECT * FROM {table} ORDER BY {measure} DESC LIMIT {n}",
         "description": "Get top {n} results by {measure}"
     },
-    {
-        "name": "join_query",
-        "sql": "SELECT {table1}.* FROM {table1} INNER JOIN {table2} ON {table1}.{join_column1} = {table2}.{join_column2} WHERE {table2}.{columns} = '{condition}'",
-        "description": "Join {table1} with {table2} on {join_column} with condition {condition}"
-    },
+    # complicate layer, Manually format the SQL query to ensure clarity in nlp.py
+    # {
+    #     "name": "join_query",
+    #     "sql": "SELECT {table1}.* FROM {table1} INNER JOIN {table2} ON {table1}.{join_column1} = {table2}.{join_column2} WHERE {table2}.{columns} = '{condition}'",
+    #     "description": "Join {table1} with {table2} on {join_column} with condition {condition}"
+    # },
     {
         "name": "basic_select",
-        "sql": "SELECT * FROM {table} WHERE {columns} = '{condition}'",
+        "sql": "SELECT {columns} FROM {table} WHERE {condition}",
         "description": "Basic select query from {table} with condition {condition}"
     },
     {
