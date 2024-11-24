@@ -15,6 +15,11 @@ sql_query_patterns = [
         "description": "Count entries by {category}"
     },
     {
+        "name": "top_n_by_measure",
+        "sql": "",
+        "description": "Get the limit number of columns desc of a table"
+    },
+    {
         "name": "average_by_category",
         "sql": "SELECT {category}, AVG({measure}) AS average FROM {table} GROUP BY {category}",
         "description": "Average {measure} by {category}"
@@ -25,8 +30,18 @@ sql_query_patterns = [
         "description": "Filter {table} by date range between {start_date} and {end_date}"
     },
     {
-        "name": "top_n_by_measure",
-        "sql": "SELECT * FROM {table} ORDER BY {measure} DESC LIMIT {n}",
+        "name": "top_n_by_measure_table",
+        "sql": "SELECT * FROM {table} ORDER BY {measure} {sort} LIMIT {n}",
+        "description": "Get top {n} results by {measure}"
+    },
+    {
+        "name": "top_n_by_measure_no_table",
+        "sql": "SELECT {column}, SUM({measure}) as total_{measure} FROM {table} GROUP BY {column} ORDER BY total_{measure} {sort} LIMIT {n}",
+        "description": "Get top {n} results by {measure}"
+    },
+    {
+        "name": "top_n_by_measure_count",
+        "sql": "SELECT {measure}, COUNT(*) as counting FROM {table} GROUP BY {measure} ORDER BY counting {sort} LIMIT {n}",
         "description": "Get top {n} results by {measure}"
     },
     # complicate layer, Manually format the SQL query to ensure clarity in nlp.py
