@@ -1,0 +1,163 @@
+
+import streamlit as st
+from sqlalchemy import create_engine
+from pymongo import MongoClient
+import mysql.connector
+import pandas as pd
+import random
+import os
+
+from nlp import process_user_input
+from query_patterns import generator
+from backend_functions import implement
+from nosql_backend import import_multiple_json_to_mongodb
+
+# Initialize database connections
+sql_examples = [
+    "SELECT * FROM incident LIMIT 5;",
+    "SELECT state, COUNT(*) AS incident_count FROM incident GROUP BY state;",
+    "SELECT * FROM shooter WHERE gender = 'Male';",
+    "SELECT school, SUM(injuries) AS total_injuries FROM incident GROUP BY school;",
+    "SELECT * FROM victim WHERE race = 'Hispanic';",
+    "SELECT city, COUNT(*) AS total_incidents FROM incident GROUP BY city ORDER BY total_incidents DESC;",
+    "SELECT DISTINCT state FROM incident;",
+    "SELECT * FROM incident WHERE date BETWEEN '2020-01-01' AND '2021-01-01';",
+    "SELECT shooteroutcome, COUNT(*) AS total_shooters FROM shooter GROUP BY shooteroutcome;",
+    "SELECT school_level, AVG(age) AS average_age FROM victim GROUP BY school_level;"
+]
+mongodb_examples = [
+    "db.incident.find().limit(5);",
+    "db.incident.aggregate([{ '$group': { '_id': '$state', 'incident_count': { '$sum': 1 } } }]);",
+    "db.shooter.find({ 'gender': 'Male' });",
+    "db.incident.aggregate([{ '$group': { '_id': '$school', 'total_injuries': { '$sum': '$injuries' } } }]);",
+    "db.victim.find({ 'race': 'Hispanic' });",
+    "db.incident.aggregate([{ '$group': { '_id': '$city', 'total_incidents': { '$sum': 1 } } }, { '$sort': { 'total_incidents': -1 } }]);",
+    "db.incident.distinct('state');",
+    "db.incident.find({ 'date': { '$gte': ISODate('2020-01-01'), '$lte': ISODate('2021-01-01') } });",
+    "db.shooter.aggregate([{ '$group': { '_id': '$shooteroutcome', 'total_shooters': { '$sum': 1 } } }]);",
+    "db.victim.aggregate([{ '$group': { '_id': '$school_level', 'average_age': { '$avg': '$age' } } }]);"
+]
+
+def display_example_queries(db_type):
+    if db_type == "SQL":
+        example_queries = random.sample(sql_examples, 3)
+        st.write("Here are 3 example SQL queries:")
+    elif db_type == "MongoDB":
+        example_queries = random.sample(mongodb_examples, 3)
+        st.write("Here are 3 example MongoDB queries:")
+
+    for i, query in enumerate(example_queries, 1):
+        st.markdown(f"**{i}.**")
+        st.code(query, language="sql" if db_type == "SQL" else "json") 
+
+# Save uploaded file to a temporary directory
+def save_uploaded_file(uploaded_file):
+    file_path = os.path.join("uploads", uploaded_file.name)
+    os.makedirs("uploads", exist_ok=True)
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return file_path
+
+def get_mysql_connection():
+    try:
+        connection = mysql.connector.connect(
+            host="localhost",
+            user="root",  # Update with your MySQL username
+            password="",  # Update with your MySQL password
+            database="db"  # Replace with your database name
+        )
+        if connection.is_connected():
+            return connection
+    except Exception as e:
+        st.error(f"Error connecting to MySQL: {e}")
+        return None
+    
+def get_sql_engine():
+    return create_engine('mysql+mysqlconnector://root@localhost/db')
+
+def get_mongo_client():
+    return MongoClient('mongodb://localhost:27017/')
+
+# Main function for the Streamlit app
+def main():
+    st.set_page_config(layout="wide")
+    st.title("ChatDB: Interactive Database Query Assistant")
+
+    # Sidebar for database selection
+    db_type = st.sidebar.selectbox("Select Database Type", ["SQL", "MongoDB"])
+    
+    # Initialize database connections
+    # sql_engine = get_sql_engine() if db_type == "SQL" else None
+    mysql_connection = get_mysql_connection() if db_type == "SQL" else None
+    mongo_client = get_mongo_client() if db_type == "MongoDB" else None
+
+    st.write(f"Using {db_type} database")
+
+    # Section for uploading datasets
+    st.sidebar.subheader("Upload Dataset")
+    uploaded_file = st.sidebar.file_uploader("Choose a CSV file", type=["csv"])
+    table_name = st.sidebar.text_input("Enter Table/Collection Name")
+    if uploaded_file and table_name:
+        try:
+            file_path = save_uploaded_file(uploaded_file)
+            if db_type == "SQL":
+                st.subheader("SQL Database Operations")
+                # Use the implement function to process the uploaded file
+                os.environ["IMPLEMENT_FILE_PATH"] = file_path  # Dynamically set the file path for the implement function
+                implement(table_name)  # Run the existing SQL data upload function
+                st.success(f"Dataset '{uploaded_file.name}' uploaded to SQL as table '{table_name}' successfully.")
+            elif db_type == "MongoDB":
+                st.subheader("MongoDB Operations")
+                import_multiple_json_to_mongodb([file_path], "us_shootings")
+                st.success(f"Dataset '{uploaded_file.name}' uploaded to MongoDB as collection '{table_name}' successfully.")
+        except Exception as e:
+            st.error(f"Error uploading dataset: {e}")
+
+    # Text input for user query
+    user_input = st.text_input("Enter your query (natural language or pattern-based):")
+        
+    # Example queries section
+    if "example" in user_input.lower():
+        st.write("Here are some examples of SQL queries you can try:")
+        display_example_queries(db_type)
+
+    elif user_input:
+        try:
+            if db_type == "SQL":
+                # Run SQL query and display results
+                sql_query, result = process_user_input(
+                    user_input=user_input,
+                    db_type=db_type,
+                    engine=mysql_connection if db_type == "SQL" else mongo_client
+                )
+                if sql_query:
+                    st.write("Generated SQL Query:")
+                    st.code(sql_query, language="sql")
+                if result:
+                    res, headers = result
+                    st.write("Query Results:")
+                    df = pd.DataFrame(res, columns=headers)
+                    st.dataframe(df, use_container_width=True) 
+                else:
+                    st.warning("No results found or query failed.")
+            elif db_type == "MongoDB":
+                # Process MongoDB query and display results
+                mongo_query, result = process_user_input(user_input, db_type)
+                if mongo_query:
+                    st.write("Generated MongoDB Query:")
+                    st.code(mongo_query, language="json")
+                if result:
+                    st.write("Query Results:")
+                    st.json(result) 
+                else:
+                    st.warning("No results found or query failed.")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
+    # Close MySQL connection when the app ends
+    if mysql_connection:
+        mysql_connection.close()
+       
+
+if __name__ == "__main__":
+    main()

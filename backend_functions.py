@@ -7,10 +7,10 @@ from sqlalchemy.sql import text
 MYSQL_USER = 'root'  # Default MySQL user created by Homebrew
 MYSQL_PASSWORD = ''  # No password set
 MYSQL_HOST = 'localhost'  # Default host
-DATABASE_NAME = 'coffee_shop_sales'
+DATABASE_NAME = 'db'
 
 # Path to the data file
-FILE_PATH = 'coffee_shop_sales.csv'
+FILE_PATH = 'data/SHOOTER.csv'
 
 # Create a new MySQL database
 def create_database(cursor, db):
@@ -30,8 +30,10 @@ def load_file(file_path):
 def create_table_from_dataframe(df, table_name, engine):
     column_types = []
     for column in df.columns:
+        # if column == 'Sources':
+        #     column_types.append(f"`{column}` TEXT")
         if df[column].dtype == 'object':
-            column_types.append(f"`{column}` VARCHAR(255)")
+            column_types.append(f"`{column}` TEXT")
         elif df[column].dtype == 'int64':
             column_types.append(f"`{column}` INT")
         elif df[column].dtype == 'float64':
@@ -48,7 +50,7 @@ def insert_dataframe_into_mysql(df, table_name, engine):
     df.to_sql(table_name, con=engine, if_exists='append', index=False)
 
 # Main implementation
-def implement():
+def implement(table_name):
     # Connect to MySQL
     mydb = mysql.connector.connect(
         host=MYSQL_HOST,
@@ -69,7 +71,6 @@ def implement():
     engine = create_engine(f"mysql+mysqlconnector://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}/{DATABASE_NAME}")
 
     # Create a table based on the DataFrame
-    table_name = "uploaded_data"
     create_table_from_dataframe(df, table_name, engine)
 
     # Insert the data into the table
