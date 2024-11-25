@@ -10,7 +10,7 @@ class QueryGenerator:
                         "from": kwargs["table2"],
                         "localField": kwargs["local_field"],
                         "foreignField": kwargs["foreign_field"],
-                        "as": kwargs["join_as"],
+                        "as": kwargs.get("join_as", "joined_data"),  # Default alias if not provided
                     }
                 },
                 {"$match": kwargs["condition"]}
@@ -53,6 +53,31 @@ def run_mongo_query(query, db_name, collection_name):
     else:
         raise ValueError("Unsupported query format.")
 
+def parse_condition(condition_str):
+    """
+    Parses a condition string and converts it into MongoDB query syntax.
+    Example:
+        "age is at least 25" -> {'age': {'$gte': 25}}
+    """
+    condition_str = condition_str.lower()
+    if "is at least" in condition_str:
+        field, value = condition_str.split("is at least")
+        return {field.strip(): {"$gte": int(value.strip())}}
+    elif "is at most" in condition_str:
+        field, value = condition_str.split("is at most")
+        return {field.strip(): {"$lte": int(value.strip())}}
+    elif "is greater than" in condition_str:
+        field, value = condition_str.split("is greater than")
+        return {field.strip(): {"$gt": int(value.strip())}}
+    elif "is less than" in condition_str:
+        field, value = condition_str.split("is less than")
+        return {field.strip(): {"$lt": int(value.strip())}}
+    elif "is" in condition_str:
+        field, value = condition_str.split("is")
+        return {field.strip(): value.strip()}
+    else:
+        raise ValueError(f"Unsupported condition format: {condition_str}")
+
 def extract_params(user_input, pattern):
     """
     Extract parameters dynamically from a natural language query based on the provided pattern.
@@ -81,9 +106,10 @@ def process_user_input_mongodb(user_input, intent, db_name="testdb", collection_
     """
     intent_config = {
         "join_query": {
-            "pattern": r"join_query (?P<columns>.+?) from (?P<table1>.+?) join (?P<table2>.+?) on (?P<join_column>.+?) where (?P<condition>.+)",
+            # Updated pattern to handle "is at least" conditions
+            "pattern": r"join_query (?P<columns>.+?) from (?P<table1>.+?) join (?P<table2>.+?) on (?P<local_field>.+?)=(?P<foreign_field>.+?) where (?P<condition>.+)",
             "query_type": "mongo_lookup",
-            "params": ["table1", "table2", "join_column", "columns", "condition"],
+            "params": ["table1", "table2", "local_field", "foreign_field", "columns", "condition"],
         },
         "total_group_by": {
             "pattern": r"total (?P<measure>.+?) by (?P<category>.+?) from (?P<table>.+)",
@@ -124,22 +150,26 @@ def process_user_input_mongodb(user_input, intent, db_name="testdb", collection_
         print(f"Missing parameters for {intent}: {missing_params}")
         return []
 
+    # Parse the condition
+    params["condition"] = parse_condition(params["condition"])
+
+    # Add a default alias for the joined data
+    params["join_as"] = "joined_data"
+
     # Generate the MongoDB query
     query = generator.generate_query(query_type, **params)
     print(f"Generated Query ({intent}): {query}")
 
     # Execute the query
-    result = run_mongo_query(query, db_name=db_name, collection_name=collection_name)
+    result = run_mongo_query(query, db_name=db_name, collection_name=params["table1"])
     print(f"Query Result ({intent}): {result}")
 
     return result
 
-# Example User Input
-user_input = "Count age by gender"
-intent = "count_by_category"
-
-# Specify database and collection dynamically
+# Example User Input for Join Query
+user_input = "join_query name, age, amount from users join orders on user_id=user_id where age is at least 25"
+intent = "join_query"
 db_name = "shooter"
-collection_name = "csvjson"
+collection_name = "users"  # The primary collection for the query
 
 process_user_input_mongodb(user_input, intent, db_name=db_name, collection_name=collection_name)
