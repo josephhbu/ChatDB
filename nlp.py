@@ -437,8 +437,10 @@ def extract_params(nl_query, pattern):
         if 'columns' in data_dict and data_dict['columns'].strip().lower() in ['all', '*']:
             data_dict['columns'] = '*'
         
-        if data_dict['table'][-1] == 's':
-            data_dict['table'] = data_dict['table'][0:-1]
+        # Adjust special cases for 'table'
+        if 'table' in data_dict:
+            if data_dict['table'].endswith('s'):  # Handle plural to singular
+                data_dict['table'] = data_dict['table'][:-1]
         
         return data_dict
 
