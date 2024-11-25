@@ -17,18 +17,18 @@ def run_sql_query(query, engine):
     #     return result.fetchall()
     cursor = engine.cursor()
     res = []
+    headers = None
     try:
         cursor.execute(query)
     
         res = cursor.fetchall()
+        headers = [desc[0] for desc in cursor.description]
     except:
         print('Run query error!')
     finally:
         cursor.close()
-        return res
+        return res, headers
         # engine.close()
-    
-
 # Steps:
 # 1. Extract Parameters Dynamically: Use regex to extract parameters from the natural language input.
 # 2. Map Intent to the Query Pattern: Use the detected intent to choose the appropriate query template.
@@ -290,7 +290,7 @@ def process_user_input_sql(user_input, intent, engine):
         print(f"Generated Describe Query: {query}")
         result = run_sql_query(query, engine)
         print("SQL Query Result:", result)
-    return result
+    return query, result
 
 def process_user_input_mongodb(user_input, intent, engine):
     result = []
@@ -447,7 +447,7 @@ def extract_params(nl_query, pattern):
     except Exception as e:
         print(f"An unexpected error occurred in extract_params: {e}")
         return None
-
+  
 
 # Main function for processing the user input
 def process_user_input(user_input, db_type, engine):
