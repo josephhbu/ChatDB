@@ -151,25 +151,25 @@ def process_user_input_mongodb(user_input, intent, db_name="testdb", collection_
         return []
 
     # Parse the condition
-    params["condition"] = parse_condition(params["condition"])
+    # params["condition"] = parse_condition(params["condition"])
 
     # Add a default alias for the joined data
-    params["join_as"] = "joined_data"
+    # params["join_as"] = "joined_data"
 
     # Generate the MongoDB query
     query = generator.generate_query(query_type, **params)
     print(f"Generated Query ({intent}): {query}")
 
     # Execute the query
-    result = run_mongo_query(query, db_name=db_name, collection_name=params["table1"])
+    result = run_mongo_query(query, db_name=db_name, collection_name=collection_name)
     print(f"Query Result ({intent}): {result}")
 
     return result
 
 # Example User Input for Join Query
-user_input = "join_query name, age, amount from users join orders on user_id=user_id where age is at least 25"
-intent = "join_query"
+user_input = "total age by gender from csvjson"
+intent = "total_group_by"
 db_name = "shooter"
-collection_name = "users"  # The primary collection for the query
+collection_name = "csvjson"  # The primary collection for the query
 
 process_user_input_mongodb(user_input, intent, db_name=db_name, collection_name=collection_name)

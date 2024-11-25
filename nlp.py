@@ -1,5 +1,6 @@
 import re
 from query_patterns import generator
+from pymongo import MongoClient
 # Assume we have an existing 'extract_params' function to extract parameters
 
 # MongoDB Query Execution
@@ -375,7 +376,7 @@ def detect_intent(user_input):
     # Define intent patterns with priorities
     intent_patterns = [
         ("join_query", r"\b(show|get)\b\s+(?P<table1>\w+)\s+\bwhich has\b\s+(?P<table2>\w+)\s+\bthat the\b\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>\w+)"),  # Specific pattern for join queries
-        ("total_group_by", r"\btotal\b.*\bby\b.*"),  # Pattern for group by queries
+        ("total_group_by", r"\btotal\b.*(\bby\b.*|\bwhere\b.*)"),  # Updated pattern to handle 'total ... where ...'
         ("filter_sort", r"\bfind\b.*\bwhere\b.*\border by\b.*"),  # Pattern for filter and sort queries
         ("count_by_category", r"\bcount\b.*\bby\b.*"),  # Pattern for count by category
         ("average_by_category", r"\baverage\b|\bmean\b.*\bof\b.*"),  # Pattern for average by category
@@ -383,13 +384,13 @@ def detect_intent(user_input):
         ("basic_select", r"\b(get|show)\b.*\bwhere\b"),  # Pattern for basic select queries
         ("list_tables", r"\bshow\b.*\btables\b"),  # Pattern for listing tables
         ("list_collections", r"\blist\b.*\bcollections\b"),  # Pattern for listing collections
-        # ("top_n_by_measure", r"\btop\b.*\bwhere\b.*"),  # Pattern for top N queries
         ("describe_attr", r"\btable\b.*\battributes\b")
     ]
 
     # Check patterns in priority order
     for intent, pattern in intent_patterns:
         if re.search(pattern, user_input):
+            print(f"Matched intent: {intent} for input: {user_input} with pattern: {pattern}")
             return intent
 
     extremes = ['highest', 'lowest', 'largest', 'smallest']
@@ -397,12 +398,8 @@ def detect_intent(user_input):
         if extreme in user_input:
             return 'top_n_by_measures'
 
-
     # Default intent if no patterns match
     return "unknown"
-
-
-
 
 
 # Extract parameters dynamically from the natural language query
@@ -472,4 +469,5 @@ def process_user_input(user_input, db_type, engine):
     
     return data_from_db
 
-
+if __name__ == "__main__":
+    detect_intent('Count age by gender')
