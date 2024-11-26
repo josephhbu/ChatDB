@@ -5,7 +5,7 @@ import sys
 
 # implement() done to upload all datasets from US shooting
 
-MYSQL_USER = ''  # Default MySQL user created by Homebrew
+MYSQL_USER = 'root'  # Default MySQL user created by Homebrew
 MYSQL_PASSWORD = ''  # No password set
 MYSQL_HOST = 'localhost'  # Default host
 DATABASE_NAME = 'db'
@@ -13,7 +13,7 @@ mydb = mysql.connector.connect(
         host=MYSQL_HOST,
         user=MYSQL_USER,
         password=MYSQL_PASSWORD,
-        database='us_shooter_test'
+        database='db'
 )
 
 query = sys.argv[1]

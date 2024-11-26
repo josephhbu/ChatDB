@@ -1,7 +1,31 @@
 import sys
 import json
+import pandas as pd
 from pymongo import MongoClient
 import os
+
+def csv_to_json(csv_file_path, json_file_path=None):
+    try:
+        df = pd.read_csv(csv_file_path, encoding="utf-8")
+        df = df.dropna(how="all")  
+        df = df.reset_index(drop=True)  
+
+        json_data = json.loads(df.to_json(orient="records"))
+        if json_file_path:
+            with open(json_file_path, "w") as outfile:
+                json.dump(json_data, outfile, indent=4)
+            print(f"JSON file saved at: {json_file_path}")
+
+        return json_data
+    except pd.errors.ParserError as e:
+        print(f"Parsing error during CSV to JSON conversion: {e}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"JSON encoding error: {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
 
 def import_multiple_json_to_mongodb(json_files, db_name):
     try:
@@ -38,6 +62,10 @@ def import_multiple_json_to_mongodb(json_files, db_name):
         print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
+    # csv_file_paths = ["data/INCIDENT.csv", "data/SHOOTER.csv", "data/VICTIM.csv", "data/WEAPON.csv"]
+    # for file in csv_file_paths:
+    #     csv_to_json(file, f"{os.path.splitext(file)[0]}.json")
+    
     if len(sys.argv) < 3:
         print("Usage: python nosql_backend.py <db_name> <json_file1> [<json_file2> ... <json_fileN>]")
         sys.exit(1)

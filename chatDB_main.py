@@ -9,9 +9,12 @@ import os
 
 from nlp import process_user_input
 from query_patterns import generator
+from queries_suggestions import process_sample_queries
 from backend_functions import implement
 from nosql_backend import import_multiple_json_to_mongodb, csv_to_json
 from mongo_test import process_user_input_mongodb
+from Mongo_NLP import parse_query, execute_query
+
 # Initialize database connections
 sql_examples = [
     "SELECT * FROM incident LIMIT 5;",
@@ -26,16 +29,8 @@ sql_examples = [
     "SELECT school_level, AVG(age) AS average_age FROM victim GROUP BY school_level;"
 ]
 mongodb_examples = [
-    "db.incident.find().limit(5);",
-    "db.incident.aggregate([{ '$group': { '_id': '$state', 'incident_count': { '$sum': 1 } } }]);",
-    "db.shooter.find({ 'gender': 'Male' });",
-    "db.incident.aggregate([{ '$group': { '_id': '$school', 'total_injuries': { '$sum': '$injuries' } } }]);",
-    "db.victim.find({ 'race': 'Hispanic' });",
-    "db.incident.aggregate([{ '$group': { '_id': '$city', 'total_incidents': { '$sum': 1 } } }, { '$sort': { 'total_incidents': -1 } }]);",
-    "db.incident.distinct('state');",
-    "db.incident.find({ 'date': { '$gte': ISODate('2020-01-01'), '$lte': ISODate('2021-01-01') } });",
-    "db.shooter.aggregate([{ '$group': { '_id': '$shooteroutcome', 'total_shooters': { '$sum': 1 } } }]);",
-    "db.victim.aggregate([{ '$group': { '_id': '$school_level', 'average_age': { '$avg': '$age' } } }]);"
+    "db.SHOOTER.aggregate([{'$lookup': {'from': 'VICTIM', 'localField': 'incidentid', 'foreignField': 'incidentid', 'as': 'victim_data'}}, {'$unwind': '$victim_data'}, {'$match': {'gender': {'$regex': '^male$', '$options': 'i'}, 'victim_data.gender': {'$regex': '^female$', '$options': 'i'}}}, {'$count': 'total'}])",
+    "",
 ]
 
 def display_example_queries(db_type):
@@ -115,7 +110,7 @@ def main():
                     json_file_path = f"{table_name}.json"
                     json_data = csv_to_json(file_path, json_file_path)
                     if json_data is not None:
-                        import_multiple_json_to_mongodb([json_file_path], "us_shootings")
+                        import_multiple_json_to_mongodb([json_file_path], "chatDB_test")
                         st.success(f"CSV file '{uploaded_file.name}' converted and uploaded to MongoDB as collection '{table_name}' successfully.")
                     else:
                         st.error("Failed to convert CSV to JSON")
@@ -130,8 +125,18 @@ def main():
         
     # Example queries section
     if "example" in user_input.lower():
-        st.write("Here are some examples of SQL queries you can try:")
-        display_example_queries(db_type)
+        # display_example_queries(db_type)
+        if db_type == "SQL":
+            st.write("Here are some examples of SQL queries you can try:")
+            result = process_sample_queries(user_input, db_type, engine=mysql_connection)
+        # else:
+        #     st.write("Here are some examples of MongoDB queries you can try:")
+        #     result = process_sample_queries(user_input, db_type, db_name='chatDB_test')
+        #     st.write(result)
+
+        for i, query in enumerate(result, 1):
+            st.markdown(f"**{i}.** {query.get('description')}")
+            st.code(query.get('query'), language="sql" if db_type == "SQL" else "json") 
 
     elif user_input:
         try:
@@ -154,14 +159,25 @@ def main():
                     st.warning("No results found or query failed.")
             elif db_type == "MongoDB":
                 # Process MongoDB query and display results
-                # mongo_query, result = process_user_input(user_input, db_type, mongo_client)
-                mongo_query, result = process_user_input_mongodb(user_input, db_name='chatDB_test', collection_name='INCIDENT')
-                if mongo_query:
+                # mongo_query, result = process_user_input(user_input, db_type, engine=mongo_client)
+                # mongo_query, result = process_user_input_mongodb(user_input, db_name="chatDB_test")
+                user_query = parse_query(user_input)
+                result = execute_query(user_query)
+                # if mongo_query:
+                #     st.write("Generated MongoDB Query:")
+                #     st.code(mongo_query, language="json")
+                if result:  
+                    mongo_query = result["query"]
+                    res = result["result"]
                     st.write("Generated MongoDB Query:")
                     st.code(mongo_query, language="json")
-                if result:
                     st.write("Query Results:")
-                    st.json(result) 
+                    if isinstance(res, list):
+                        st.json(res)  # Display as JSON
+                    elif isinstance(res, dict):
+                        st.json(res)  # Display a single document
+                    else:
+                        st.write(res)
                 else:
                     st.warning("No results found or query failed.")
         except Exception as e:

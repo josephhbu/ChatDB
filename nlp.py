@@ -10,7 +10,7 @@ def run_mongo_query(query, db_name):
     client = MongoClient('mongodb://localhost:27017/')
     db = client[db_name]
     result = db.command(query)
-    return result
+    return query, result
 
 # Function to run a SQL query
 def run_sql_query(query, engine):
