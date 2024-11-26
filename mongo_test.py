@@ -87,15 +87,24 @@ def extract_params(user_input, pattern):
         raise ValueError(f"Failed to extract parameters from: {user_input}")
     return match.groupdict()
 
-def extract_collections(user_input):
+def extract_collections(user_input, db=None):
     """
     Extract collections dynamically from the user input.
+    If the query is 'list collections', return all collections in the database.
     """
+    # Handle the special case for "list collections"
+    if "list collections" in user_input.lower():
+        if db is None:  # Explicitly check if db is None
+            raise ValueError("Database connection is required to list collections.")
+        return db.list_collection_names()  # Return all collections in the database
+
+    # General case for extracting collections
     match = re.search(r"from ([\w\s]+(?:and [\w\s]+)*)", user_input, re.IGNORECASE)
     if not match:
         raise ValueError("No collections specified in the query.")
     collections = match.group(1).split(" and ")
     return [collection.strip() for collection in collections]
+
 
 def detect_intent(user_input):
     """
@@ -118,42 +127,49 @@ def process_user_input_mongodb(user_input, db_name):
     """
     Processes the user input and executes a MongoDB query based on the detected intent.
     """
+    client = MongoClient("mongodb://localhost:27017/")
+    db = client[db_name]
+
     intent = detect_intent(user_input)
     if intent == "unknown":
         raise ValueError(f"Unable to detect intent for query: {user_input}")
 
+    # Handle the special case for "list collections"
+    if intent == "list_collections":
+        return extract_collections(user_input, db=db)
+
     # Extract collections dynamically from the user input
-    collections = extract_collections(user_input)
+    collections = extract_collections(user_input, db=db)
     if not collections:
         raise ValueError("No collections found in the query.")
     
     intent_config = {
-    "join_query": {
-        "pattern": r"from (?P<table1>\w+) and (?P<table2>\w+) join (?P<local_field>\w+\.\w+) with (?P<foreign_field>\w+\.\w+) where (?P<condition>.+)",
-        "query_type": "mongo_lookup",
-        "params": ["table1", "table2", "local_field", "foreign_field", "condition"],
-    },
-    "total_group_by": {
-        "pattern": r"from (?P<table>\w+) total (?P<measure>\w+) by (?P<category>\w+)",
-        "query_type": "mongo_group_sum",
-        "params": ["category", "measure"],
-    },
-    "filter_sort": {
-        "pattern": r"from (?P<table>\w+) find (?P<columns>.+?) where (?P<condition>.+) order by (?P<sort_column>\w+) (?P<sort_order>\w+)",
-        "query_type": "mongo_filter_and_sort",
-        "params": ["condition", "sort_column", "sort_order"],
-    },
-    "count_by_category": {
-        "pattern": r"from (?P<table>\w+) count (?P<category>\w+)",
-        "query_type": "mongo_count_by_category",
-        "params": ["category"],
-    },
-    "list_collections": {
-        "pattern": None,
-        "query_type": "mongo_list_collections",
-        "params": [],
-    },
-}
+        "join_query": {
+            "pattern": r"from (?P<table1>\w+) and (?P<table2>\w+) join (?P<local_field>\w+\.\w+) with (?P<foreign_field>\w+\.\w+) where (?P<condition>.+)",
+            "query_type": "mongo_lookup",
+            "params": ["table1", "table2", "local_field", "foreign_field", "condition"],
+        },
+        "total_group_by": {
+            "pattern": r"from (?P<table>\w+) total (?P<measure>\w+) by (?P<category>\w+)",
+            "query_type": "mongo_group_sum",
+            "params": ["category", "measure"],
+        },
+        "filter_sort": {
+            "pattern": r"from (?P<table>\w+) find (?P<columns>.+?) where (?P<condition>.+) order by (?P<sort_column>\w+) (?P<sort_order>\w+)",
+            "query_type": "mongo_filter_and_sort",
+            "params": ["condition", "sort_column", "sort_order"],
+        },
+        "count_by_category": {
+            "pattern": r"from (?P<table>\w+) count (?P<category>\w+)",
+            "query_type": "mongo_count_by_category",
+            "params": ["category"],
+        },
+        "list_collections": {
+            "pattern": None,
+            "query_type": "mongo_list_collections",
+            "params": [],
+        },
+    }
 
     config = intent_config[intent]
     pattern = config["pattern"]
@@ -179,6 +195,6 @@ def process_user_input_mongodb(user_input, db_name):
     return results
 
 
-user_input = "from Shooter and Incident join Shooter.incidentid with Incident.Incident_ID where Shooter.age is greater than 25"
+user_input = "list collections"
 results = process_user_input_mongodb(user_input, "shooter")
 print(results)
