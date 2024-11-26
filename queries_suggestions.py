@@ -190,13 +190,102 @@ def generate_sample_queries(db_type, metadata, construct=None, limit=3, engine=N
     return sample_queries
 
 
+def generate_mongo_sample_queries(metadata, construct=None, limit=3):
+    """
+    Generate a set of sample queries dynamically using actual MongoDB metadata.
+
+    Args:
+        metadata (dict): Metadata of the MongoDB database (collections/fields).
+        construct (str, optional): Specific construct to filter (e.g., 'aggregate', 'find').
+        limit (int): Number of sample queries to generate.
+
+    Returns:
+        list: A list of sample queries with their natural language representation.
+    """
+    sample_queries = []
+    used_patterns = set()
+    collection_names = list(metadata.keys())
+    
+    # Filter patterns if a construct is specified
+    patterns = mongo_query_patterns
+    if construct:
+        patterns = [pattern for pattern in patterns if construct.lower() in pattern["query"].lower()]
+
+    for _ in range(limit):
+        if not patterns:
+            break  # No more unique patterns available
+        pattern = random.choice(patterns)
+        patterns.remove(pattern)  # Ensure unique queries for the current run
+        used_patterns.add(pattern["description"])
+
+        # Randomly select a collection and its fields
+        collection = random.choice(collection_names)
+        fields = metadata[collection] if collection in metadata else []
+        if not fields:
+            continue
+
+        # Classify fields
+        numeric_fields = [field for field in fields if "int" in field or "double" in field or "float" in field]
+        string_fields = [field for field in fields if field not in numeric_fields]
+        date_fields = [field for field in fields if "date" in field]
+
+        placeholders = {
+            "collection": collection,
+            "field": random.choice(fields),
+            "numeric_field": random.choice(numeric_fields) if numeric_fields else random.choice(fields),
+            "string_field": random.choice(string_fields) if string_fields else random.choice(fields),
+            "date_field": random.choice(date_fields) if date_fields else None,
+            "value": "example_value",
+            "start_date": "2022-01-01",
+            "end_date": "2022-12-31",
+        }
+
+        # Skip queries that require a date field but none exist
+        if "{date_field}" in pattern.get("query", "") and not placeholders["date_field"]:
+            continue
+
+        # Fill placeholders in the query
+        try:
+            query = pattern["query"].format(**placeholders)
+
+            # Create a human-readable description
+            description_templates = {
+                "basic_find": "Retrieve all documents from {collection} where {field} is {value}.",
+                "aggregate_sum": "Calculate the total of {numeric_field} grouped by {field} in {collection}.",
+                "filter_date_range": "Find documents in {collection} where {date_field} is between {start_date} and {end_date}.",
+                "top_n": "Find top 5 documents in {collection} sorted by {numeric_field} in descending order.",
+            }
+            description = description_templates.get(pattern["name"], pattern["description"]).format(
+                **placeholders
+            )
+
+            # Append the query and description to the results
+            sample_queries.append({
+                "description": description,
+                "query": query
+            })
+        except KeyError as e:
+            print(f"Missing placeholder: {e}")
+
+    return sample_queries
 
 
 
 # Process user input for generating sample queries
-def process_sample_queries(user_input, db_type, engine, metadata=None):
+def process_sample_queries(user_input, db_type, engine=None, metadata=None):
+    """
+    Process user input for generating sample queries.
+
+    Args:
+        user_input (str): The user input specifying the query construct.
+        db_type (str): Database type ('SQL' or 'MongoDB').
+        engine: Database engine for SQL or MongoDB client for MongoDB.
+        metadata (dict, optional): Metadata of the database.
+
+    Returns:
+        list: A list of generated sample queries.
+    """
     construct = None
-    
 
     if not metadata:
         if db_type == "SQL":
@@ -204,10 +293,14 @@ def process_sample_queries(user_input, db_type, engine, metadata=None):
         elif db_type == "MongoDB":
             metadata = fetch_mongo_metadata(engine)
 
-    # Limit the number of sample queries to 3
     if "with" in user_input:
-        construct = user_input.split("with")[-1].strip()        
-    queries = generate_sample_queries(db_type, metadata, construct=construct, limit=3, engine=engine)
+        construct = user_input.split("with")[-1].strip()
+
+    if db_type == "SQL":
+        queries = generate_sample_queries(db_type, metadata, construct=construct, limit=3, engine=engine)
+    elif db_type == "MongoDB":
+        queries = generate_mongo_sample_queries(metadata, construct=construct, limit=3)
+
     for query in queries:
         print(f"Description: {query['description']}\nQuery: {query['query']}\n")
     return queries
