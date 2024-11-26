@@ -91,7 +91,38 @@ def extract_params(user_input, pattern):
         return {}
     return match.groupdict()
 
-def process_user_input_mongodb(user_input, intent, db_name="testdb", collection_name="orders"):
+def detect_intent(user_input):
+    user_input = user_input.lower().strip()
+
+    # Define intent patterns with priorities
+    intent_patterns = [
+        ("join_query", r"\b(show|get)\b\s+(?P<table1>\w+)\s+\bwhich has\b\s+(?P<table2>\w+)\s+\bthat the\b\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>\w+)"),  # Specific pattern for join queries
+        ("total_group_by", r"\btotal\b.*(\bby\b.*|\bwhere\b.*)"),  # Updated pattern to handle 'total ... where ...'
+        ("filter_sort", r"\bfind\b.*\bwhere\b.*\border by\b.*"),  # Pattern for filter and sort queries
+        ("count_by_category", r"\bcount\b.*\bby\b.*"),  # Pattern for count by category
+        ("average_by_category", r"\baverage\b|\bmean\b.*\bof\b.*"),  # Pattern for average by category
+        ("filter_by_date_range", r"\bshow\b.*\bfrom\b.*\bto\b.*"),  # Pattern for date range filters
+        ("basic_select", r"\b(get|show)\b.*\bwhere\b"),  # Pattern for basic select queries
+        ("list_tables", r"\bshow\b.*\btables\b"),  # Pattern for listing tables
+        ("list_collections", r"\blist\b.*\bcollections\b"),  # Pattern for listing collections
+        ("describe_attr", r"\btable\b.*\battributes\b")
+    ]
+
+    # Check patterns in priority order
+    for intent, pattern in intent_patterns:
+        if re.search(pattern, user_input):
+            print(f"Matched intent: {intent} for input: {user_input} with pattern: {pattern}")
+            return intent
+
+    extremes = ['highest', 'lowest', 'largest', 'smallest']
+    for extreme in extremes:
+        if extreme in user_input:
+            return 'top_n_by_measures'
+
+    # Default intent if no patterns match
+    return "unknown"
+
+def process_user_input_mongodb(user_input, db_name="testdb", collection_name="orders"):
     """
     Processes the user input and executes a MongoDB query based on the detected intent.
 
@@ -133,10 +164,11 @@ def process_user_input_mongodb(user_input, intent, db_name="testdb", collection_
         },
     }
 
-    if intent not in intent_config:
-        print(f"Unsupported intent: {intent}")
-        return []
+    # if intent not in intent_config:
+    #     print(f"Unsupported intent: {intent}")
+    #     return []
 
+    intent = detect_intent(user_input)
     config = intent_config[intent]
     pattern = config["pattern"]
     query_type = config["query_type"]
