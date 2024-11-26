@@ -25,74 +25,104 @@ def parse_query(query):
     if match:
         gender = match.group(1)
         return {
-            "operation": "count",
-            "collection": "Shooter",
-            "filter": {"gender": gender}
+        "operation": "count",
+        "collection": "shooter",  # Match the actual collection name
+        "filter": {"gender": {"$regex": f"^{gender}$", "$options": "i"}}  # Case-insensitive match
         }
-
+    
     # Count victims with specific injury
     match = re.match(r"how many victims were (\w+)", query)
     if match:
         injury = match.group(1)
         return {
-            "operation": "count",
-            "collection": "Victim",
-            "filter": {"injury": {"$regex": injury, "$options": "i"}}
+        "operation": "count",
+        "collection": "victim",  # Match the exact name of the collection
+        "filter": {"injury": {"$regex": f"^{injury}$", "$options": "i"}}  # Case-insensitive match
         }
 
-    # Count victims by age condition
-    match = re.match(r"how many victims were (over|under|between) (\d+)(?: and (\d+))?", query)
-    if match:
-        condition, age1, age2 = match.groups()
-        if condition == "over":
-            return {
-                "operation": "count",
-                "collection": "Victim",
-                "filter": {"age": {"$gt": int(age1)}}
-            }
-        elif condition == "under":
-            return {
-                "operation": "count",
-                "collection": "Victim",
-                "filter": {"age": {"$lt": int(age1)}}
-            }
-        elif condition == "between":
-            return {
-                "operation": "count",
-                "collection": "Victim",
-                "filter": {"age": {"$gte": int(age1), "$lte": int(age2)}}
-            }
+    # match = re.match(r"how many victims were (over|under|between) (\d+)(?: and (\d+))?", query)
+    # if match:
+    #     condition, age1, age2 = match.groups()
+    #     age1 = int(age1)
+    #     age2 = int(age2) if age2 else None
 
-    # Count incidents by location
+    #     # Handle "over" condition
+    #     if condition == "over":
+    #         return {
+    #         "operation": "count",
+    #         "collection": "victim",  # Lowercase collection name
+    #         "filter": {
+    #             "$and": [
+    #                 {"age": {"$exists": True, "$ne": ""}},  # Ensure `age` is non-empty
+    #                 {"$expr": {"$gt": [{"$toInt": "$age"}, age1]}}  # Dynamically convert `age` to int and compare
+    #                 ]
+    #             }
+    #         }
+
+    #     # Handle "under" condition
+    #     elif condition == "under":
+    #         return {
+    #         "operation": "count",
+    #         "collection": "victim",  # Lowercase collection name
+    #         "filter": {
+    #             "$and": [
+    #                 {"age": {"$exists": True, "$ne": ""}},  # Ensure `age` is non-empty
+    #                 {"$expr": {"$lt": [{"$toInt": "$age"}, age1]}}  # Dynamically convert `age` to int and compare
+    #                 ]
+    #             }
+    #         }
+
+    #     # Handle "between" condition
+    #     elif condition == "between":
+    #         if age2 is None:
+    #             raise ValueError("The 'between' condition requires two age values.")
+    #         return {
+    #         "operation": "count",
+    #         "collection": "victim",  # Lowercase collection name
+    #         "filter": {
+    #             "$and": [
+    #                 {"age": {"$exists": True, "$ne": ""}},  # Ensure `age` is non-empty
+    #                 {"$expr": {
+    #                     "$and": [
+    #                         {"$gte": [{"$toInt": "$age"}, age1]},  # Convert `age` to int and check >= age1
+    #                         {"$lte": [{"$toInt": "$age"}, age2]}   # Convert `age` to int and check <= age2
+    #                         ]
+    #                     }}
+    #                 ]
+    #             }
+    #         }
+
+    # Query: Count incidents by location
     match = re.match(r"how many incidents occurred in (\w+)", query)
     if match:
-        location = match.group(1).upper()
+        location = match.group(1).upper()  # Standardize location to uppercase
         return {
-            "operation": "count",
-            "collection": "Incident",
-            "filter": {"location": location}
+        "operation": "count",
+        "collection": "incident",  # Lowercase collection name
+        "filter": {"State": location}
         }
 
-    # Join query for incidents with male shooter and female victim
+    # Query: Join query for incidents with male shooter and female victim
     match = re.match(r"how many incidents had a (\w+) shooter and a (\w+) victim", query)
     if match:
         shooter_gender, victim_gender = match.groups()
         return {
-            "operation": "join_count",
-            "lookup": {
-                "from": "Victim",
-                "localField": "incident_id",
-                "foreignField": "incident_id",
-                "as": "victim_data"
-            },
-            "collection": "Shooter",
-            "filter": {
-                "gender": shooter_gender,
-                "victim_data.gender": victim_gender
-            }
+        "operation": "join_count",
+        "lookup": {
+            "from": "victim",  # Lowercase collection name for lookup
+            "localField": "incidentid",  # Match field for joining
+            "foreignField": "incidentid",
+            "as": "victim_data"
+        },
+        "collection": "shooter",  # Lowercase main collection name
+        "filter": {
+            "gender": {"$regex": f"^{shooter_gender}$", "$options": "i"},  # Case-insensitive shooter gender
+            "victim_data.gender": {"$regex": f"^{victim_gender}$", "$options": "i"}  # Case-insensitive victim gender
+        }
         }
 
-    return {"error": "Query not recognized"}
+    # Fallback for unmatched query
+    return "Query not recognized or improperly formatted."
 
 def is_mongo_query(query):
     """
