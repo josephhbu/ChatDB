@@ -1,7 +1,9 @@
 import re
 from query_patterns import generator
+from queries_suggestions import fetch_sql_metadata, fetch_mongo_metadata, process_sample_queries
+from sqlalchemy.sql import text
 from pymongo import MongoClient
-# Assume we have an existing 'extract_params' function to extract parameters
+
 
 # MongoDB Query Execution
 def run_mongo_query(query, db_name):
@@ -33,9 +35,6 @@ def run_sql_query(query, engine):
 # 1. Extract Parameters Dynamically: Use regex to extract parameters from the natural language input.
 # 2. Map Intent to the Query Pattern: Use the detected intent to choose the appropriate query template.
 # 3. Generate Queries Dynamically: Once parameters are extracted, use them to generate the query using the pattern's template depending on the database chosen (MongoDB or SQL).
-
-# Function to detect the intent of the user input
-
 
 def process_user_input_sql(user_input, intent, engine):
 
@@ -75,9 +74,9 @@ def process_user_input_sql(user_input, intent, engine):
         result = run_sql_query(query, engine)
     
     elif intent == "filter_by_date_range":
-        pattern = r"show\s+(?P<table>\w+)\s+where\s+(?P<date_column>\w+)\s+is\s+between\s+'(?P<start_date>[\d-]+)'\s+and\s+'(?P<end_date>[\d-]+)'"
+        pattern = r"show\s+(?P<table>\w+)\s+where\s+(?P<date_column>\w+)\s+is\s+(from|between)\s+'(?P<start_date>[\d-]+)'\s+(to|and)\s+'(?P<end_date>[\d-]+)'"
         params = extract_params(user_input, pattern)
-        
+
         if params:
             # Use generator to construct the query
             query = generator.generate_query(
@@ -94,7 +93,7 @@ def process_user_input_sql(user_input, intent, engine):
     elif intent == 'basic_select':
         # Flexible pattern for basic select queries
         if " of " in user_input:
-            pattern = r"(get|show)\s+(?P<columns>[\w\s,]+)\s+of\s+(?P<table>\w+)\s*(?:where\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>[\w\s]+))?"
+            pattern = r"(get|show)\s+(?P<columns>[\w\s,]+)\s+(of)\s+(?P<table>\w+)\s*(?:where\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>[\w\s]+))?"
         else:
             user_input = user_input.replace(" all ", " ").replace(" every ", " ")    
             pattern = r"(get|show)\s+(?P<table>\w+)\s*(?:where\s+(?P<column>\w+)\s+(is|=)\s+(?P<value>\w+))?"
@@ -116,7 +115,7 @@ def process_user_input_sql(user_input, intent, engine):
             query = generator.generate_query(
                 "basic_select",
                 table=params["table"],
-                condition=condition if condition else "1=1",  # Default to no filtering
+                condition=condition if condition else '',  # Default to no filtering
                 columns=columns
             )
             print("Generated Basic Select Query:", query)
@@ -150,7 +149,7 @@ def process_user_input_sql(user_input, intent, engine):
             result = run_sql_query(query, engine)  # Run SQL query
             print("Generated and Executed SQL Group By Query:", query)
             print("SQL Query Result:", result)
-             
+
     elif intent == "filter_sort":
         pattern = r"find\s+(?P<columns>(?:\w+\s*,\s*)*\w+)\s+from\s+(?P<table>\w+)\s+where\s+(?P<condition>.+)\s+order\s+by\s+(?P<sort_column>\w+)\s+(?P<sort_order>asc|desc)"
         params = extract_params(user_input, pattern)
@@ -165,7 +164,7 @@ def process_user_input_sql(user_input, intent, engine):
 
             # Generate the query dynamically using the generator
             query = generator.generate_query(
-                "filter_and_sort",
+                "filter_sort",
                 columns=columns,  # Dynamically include columns
                 table=params["table"],
                 condition=condition,
@@ -200,7 +199,12 @@ def process_user_input_sql(user_input, intent, engine):
     
     elif intent == 'top_n_by_measures':
         query = generator.generate_query("list_tables")
-        tables = run_sql_query(query, engine)
+        tuple_of_tables = run_sql_query(query, engine)
+        tables = []
+        for item in tuple_of_tables:            
+            if type(item[0]) == tuple:
+                tables=item
+        
         tables =  [item[0].lower() for item in tables]
         
         trim_input = user_input.replace("get me ", "").replace('get ', '')
@@ -216,9 +220,14 @@ def process_user_input_sql(user_input, intent, engine):
             sort = 'DESC'
         else:
             sort = 'ASC'
-
-        if tokens[1] in tables:
-            table = tokens[1]
+        
+        if tokens[1] in tables or tokens[1][:-1] in tables:
+            print(tokens[1])
+            if tokens[1] in tables:    
+                table = tokens[1]
+            else:
+                table = tokens[1][:-1]
+                
             measure = tokens[-1]
             print( number, table, measure, sort) 
             print('NORMAL GET ORDER BY MEASURE')
@@ -227,7 +236,7 @@ def process_user_input_sql(user_input, intent, engine):
                 measure=measure,
                 table=table,
                 n=number,
-                sort=sort
+                sort_order=sort
             )
             result = run_sql_query(query, engine)
         else:
@@ -247,7 +256,7 @@ def process_user_input_sql(user_input, intent, engine):
                     measure=measure,
                     table=chosen_table,
                     n=number,
-                    sort=sort
+                    sort_order=sort
                 )
                 result = run_sql_query(query, engine)
             else:
@@ -256,20 +265,18 @@ def process_user_input_sql(user_input, intent, engine):
                 
                 for table in tables:
                     query = 'SHOW COLUMNS FROM ' + table.upper()
-                    cols = run_sql_query(query, engine)
+                    cols = run_sql_query(query, engine)[0]
                     cols = [item[0].lower() for item in cols]
                     if column in cols  and measure in cols:
                         chosen_table = table                            
                         break
                 
-                print(number, column, measure, sort, chosen_table) #
-                print('select sum')
                 query = generator.generate_query(
                     "top_n_by_measure_no_table",
                     measure=measure,
                     table=chosen_table,
                     n=number,
-                    sort=sort,
+                    sort_order=sort,
                     column=column
                 )
                 result = run_sql_query(query, engine)
@@ -292,83 +299,6 @@ def process_user_input_sql(user_input, intent, engine):
         print("SQL Query Result:", result)
     return query, result
 
-def process_user_input_mongodb(user_input, intent, engine):
-    result = []
-    if intent == "join_query":
-        # Extract parameters for a join query
-        pattern = "join_query {columns} from {table1} join {table2} on {join_column} where {condition}"
-        params = extract_params(user_input, pattern)
-
-        if params:
-            if db_type == 'MongoDB':
-                query = generator.generate_query(
-                    "mongo_lookup",
-                    table1=params["table1"],
-                    table2=params["table2"],
-                    local_field=params["join_column"],
-                    foreign_field=params["join_column"],  # Same field in this example
-                    join_as=params["columns"],
-                    condition=params["condition"]
-                )
-                print("Generated Join Query (MongoDB):", query)
-            else:
-                print(f"Unable to extract parameters from: {user_input}")
-
-    elif intent == "total_group_by":
-        # Extract parameters for a 'total_by_category' query
-        pattern = "total {measure} by {category} from {table}"
-        params = extract_params(user_input, pattern)
-
-        if params:
-            if db_type == 'MongoDB':
-                query = generator.generate_query(
-                    "mongo_group_sum",
-                    category=params["category"],
-                    measure=params["measure"]
-                )
-                result = run_mongo_query(query)  # Run MongoDB query
-                print("Generated and Executed MongoDB Group By Query:", query)
-                print("MongoDB Query Result:", result)
-
-    elif intent == "filter_sort":
-        # Extract parameters for a filter and sort query
-        pattern = "find {columns} from {table} where {condition} order by {sort_column} {sort_order}"
-        params = extract_params(user_input, pattern)
-
-        if params:
-            if db_type == 'MongoDB':
-                query = generator.generate_query(
-                    "mongo_filter_and_sort",
-                    condition=params["condition"],
-                    sort_column=params["sort_column"],
-                    sort_order=params["sort_order"]
-                )
-                result = run_mongo_query(query)  # Run MongoDB query
-                print("Generated and Executed MongoDB Filter Sort By Query:", query)
-                print("MongoDB Query Result:", result)
-
-    elif intent == "count_by_category":
-        # Extract parameters for count by category query
-        pattern = "count {measure} by {category} from {table}"
-        params = extract_params(user_input, pattern)
-
-        if params:
-            if db_type == 'MongoDB':
-                query = generator.generate_query(
-                    "mongo_count_by_category",
-                    category=params["category"]
-                )
-                result = run_mongo_query(query)  # Run MongoDB query
-                print("Generated and Executed MongoDB Count By Query:", query)
-                print("MongoDB Query Result:", result)
-
-    elif intent == "list_collections":
-        # Generate query for listing collections in MongoDB
-        if db_type == 'MongoDB':
-            query = generator.generate_query("mongo_list_collections")
-            result = run_mongo_query(query)  # Run MongoDB query
-            print("Generated List Collections Query:", query)
-            print("MongoDB Query Result:", result)
 
 def detect_intent(user_input):
     user_input = user_input.lower().strip()
@@ -380,11 +310,15 @@ def detect_intent(user_input):
         ("filter_sort", r"\bfind\b.*\bwhere\b.*\border by\b.*"),  # Pattern for filter and sort queries
         ("count_by_category", r"\bcount\b.*\bby\b.*"),  # Pattern for count by category
         ("average_by_category", r"\baverage\b|\bmean\b.*\bof\b.*"),  # Pattern for average by category
-        ("filter_by_date_range", r"\bshow\b.*\bfrom\b.*\bto\b.*"),  # Pattern for date range filters
+        ("filter_by_date_range", r"\bshow\b.*\b(from|between)\b.*\b(to|and)\b.*"),  # Pattern for date range filters
         ("basic_select", r"\b(get|show)\b.*\bwhere\b"),  # Pattern for basic select queries
         ("list_tables", r"\bshow\b.*\btables\b"),  # Pattern for listing tables
         ("list_collections", r"\blist\b.*\bcollections\b"),  # Pattern for listing collections
-        ("describe_attr", r"\btable\b.*\battributes\b")
+        # ("top_n_by_measure", r"\btop\b.*\bwhere\b.*"),  # Pattern for top N queries
+        ("describe_attr", r"\btable\b.*\battributes\b"),
+        ("sample_queries", r"\bsample queries\b"),
+        ("sample_construct_queries", r"\bsample queries with\b.*")
+
     ]
 
     # Check patterns in priority order
@@ -458,7 +392,11 @@ def process_user_input(user_input, db_type, engine):
         print("Cannot detect intention")
         return []
 
-    data_from_db =  []
+    if intent == "sample_queries" or intent == "sample_construct_queries":
+        # Generate sample queries and return them
+        return process_sample_queries(user_input, db_type, engine)
+
+    data_from_db = []
     if db_type == 'SQL':
         data_from_db = process_user_input_sql(user_input, intent, engine)
     elif db_type == 'MongoDB':
@@ -466,8 +404,4 @@ def process_user_input(user_input, db_type, engine):
     else:
         print("Invalid DB Type")
         return []
-    
     return data_from_db
-
-if __name__ == "__main__":
-    detect_intent('Count age by gender')
