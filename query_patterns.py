@@ -5,19 +5,14 @@ sql_query_patterns = [
         "description": "Total {measure} by {category}"
     },
     {
-    "name": "filter_and_sort",
-    "sql": "SELECT {columns} FROM {table} WHERE {condition} ORDER BY {sort_column} {sort_order}",
-    "description": "Filter {table} by {condition} and sort by {sort_column}, selecting specific columns"
+        "name": "filter_sort",
+        "sql": "SELECT {columns} FROM {table} WHERE {condition} ORDER BY {sort_column} {sort_order}",
+        "description": "find {columns} from {table} where {condition} order by {sort_column} {sort_order}"
     },
     {
         "name": "count_by_category",
         "sql": "SELECT {category}, COUNT(*) AS count FROM {table} GROUP BY {category}",
         "description": "Count entries by {category}"
-    },
-    {
-        "name": "top_n_by_measure",
-        "sql": "",
-        "description": "Get the limit number of columns desc of a table"
     },
     {
         "name": "average_by_category",
@@ -26,23 +21,23 @@ sql_query_patterns = [
     },
     {
         "name": "filter_by_date_range",
-        "sql": "SELECT * FROM {table} WHERE STR_TO_DATE({date_column}, '%Y-%m-%d') BETWEEN STR_TO_DATE('{start_date}', '%Y-%m-%d') AND STR_TO_DATE('{end_date}', '%Y-%m-%d')",
+        "sql": "SELECT * FROM {table} WHERE CONVERT(DATE, {date_column}) >= '{start_date}' AND CONVERT(DATE, {date_column}) <= '{end_date}' ",
         "description": "Filter {table} by date range between {start_date} and {end_date}"
     },
     {
         "name": "top_n_by_measure_table",
-        "sql": "SELECT * FROM {table} ORDER BY {measure} {sort} LIMIT {n}",
-        "description": "Get top {n} results by {measure}"
+        "sql": "SELECT * FROM {table} ORDER BY {measure} {sort_order} LIMIT {n}",
+        "description": "get me {n} {table} with highest {measure}"
     },
     {
         "name": "top_n_by_measure_no_table",
-        "sql": "SELECT {column}, SUM({measure}) as total_{measure} FROM {table} GROUP BY {column} ORDER BY total_{measure} {sort} LIMIT {n}",
-        "description": "Get top {n} results by {measure}"
+        "sql": "SELECT {column}, SUM({measure}) as total_{measure} FROM {table} GROUP BY {column} ORDER BY total_{measure} {sort_order} LIMIT {n}",
+        "description": "get me {n} {column} with highest number of {measure}"
     },
     {
         "name": "top_n_by_measure_count",
-        "sql": "SELECT {measure}, COUNT(*) as counting FROM {table} GROUP BY {measure} ORDER BY counting {sort} LIMIT {n}",
-        "description": "Get top {n} results by {measure}"
+        "sql": "SELECT {measure}, COUNT(*) as counting FROM {table} GROUP BY {measure} ORDER BY counting {sort_order} LIMIT {n}",
+        "description": "get me {n} {table} with highest {measure}"
     },
     # complicate layer, Manually format the SQL query to ensure clarity in nlp.py
     # {
@@ -53,12 +48,12 @@ sql_query_patterns = [
     {
         "name": "basic_select",
         "sql": "SELECT {columns} FROM {table} WHERE {condition}",
-        "description": "Basic select query from {table} with condition {condition}"
+        "description": "get me {columns} of {table} where {condition}"
     },
     {
         "name": "list_tables",
         "sql": "SHOW TABLES",
-        "description": "List all tables in the database"
+        "description": "show tables"
     }
 ]
 
