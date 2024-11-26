@@ -10,8 +10,8 @@ import os
 from nlp import process_user_input
 from query_patterns import generator
 from backend_functions import implement
-from nosql_backend import import_multiple_json_to_mongodb
-
+from nosql_backend import import_multiple_json_to_mongodb, csv_to_json
+from mongo_test import process_user_input_mongodb
 # Initialize database connections
 sql_examples = [
     "SELECT * FROM incident LIMIT 5;",
@@ -103,13 +103,25 @@ def main():
             if db_type == "SQL":
                 st.subheader("SQL Database Operations")
                 # Use the implement function to process the uploaded file
-                os.environ["IMPLEMENT_FILE_PATH"] = file_path  # Dynamically set the file path for the implement function
-                implement(table_name)  # Run the existing SQL data upload function
-                st.success(f"Dataset '{uploaded_file.name}' uploaded to SQL as table '{table_name}' successfully.")
+                if file_path.lower().endswith('.csv'):
+                    os.environ["IMPLEMENT_FILE_PATH"] = file_path  # Dynamically set the file path for the implement function
+                    implement(table_name)  # Run the existing SQL data upload function
+                    st.success(f"Dataset '{uploaded_file.name}' uploaded to SQL as table '{table_name}' successfully.")
+                else:
+                    st.error("Unsupported file format. Please upload a CSV.")
             elif db_type == "MongoDB":
                 st.subheader("MongoDB Operations")
-                import_multiple_json_to_mongodb([file_path], "us_shootings")
-                st.success(f"Dataset '{uploaded_file.name}' uploaded to MongoDB as collection '{table_name}' successfully.")
+                if file_path.lower().endswith('.csv'):
+                    json_file_path = f"{table_name}.json"
+                    json_data = csv_to_json(file_path, json_file_path)
+                    if json_data is not None:
+                        import_multiple_json_to_mongodb([json_file_path], "us_shootings")
+                        st.success(f"CSV file '{uploaded_file.name}' converted and uploaded to MongoDB as collection '{table_name}' successfully.")
+                    else:
+                        st.error("Failed to convert CSV to JSON")
+                else:
+                    st.error("Unsupported file format. Please upload a CSV or JSON file.")
+
         except Exception as e:
             st.error(f"Error uploading dataset: {e}")
 
@@ -142,7 +154,8 @@ def main():
                     st.warning("No results found or query failed.")
             elif db_type == "MongoDB":
                 # Process MongoDB query and display results
-                mongo_query, result = process_user_input(user_input, db_type)
+                # mongo_query, result = process_user_input(user_input, db_type, mongo_client)
+                mongo_query, result = process_user_input_mongodb(user_input, db_name='chatDB_test', collection_name='INCIDENT')
                 if mongo_query:
                     st.write("Generated MongoDB Query:")
                     st.code(mongo_query, language="json")
