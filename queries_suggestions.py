@@ -17,11 +17,6 @@ def fetch_sql_metadata(engine):
     """
     metadata = {}
     query = "SHOW TABLES;"
-    # with engine.connect() as connection:
-    #     tables = [row[0] for row in connection.execute(text(query))]
-    #     for table in tables:
-    #         column_query = f"SHOW COLUMNS FROM {table};"
-    #         columns = connection.execute(text(column_query)).fetchall()
             
     cursor = engine.cursor()
     cursor.execute(query)
@@ -74,7 +69,7 @@ def generate_sample_queries(db_type, metadata, construct=None, limit=3, engine=N
     Returns:
         list: A list of sample queries with their natural language representation.
     """
-    patterns = sql_query_patterns if db_type.lower() == 'sql' else mongo_query_patterns
+    patterns = sql_query_patterns 
 
     # Filter patterns by construct if specified
     if construct:
@@ -189,7 +184,6 @@ def generate_sample_queries(db_type, metadata, construct=None, limit=3, engine=N
 
     return sample_queries
 
-
 def generate_mongo_sample_queries(metadata, construct=None, limit=3):
     """
     Generate a set of sample queries dynamically using actual MongoDB metadata.
@@ -210,7 +204,6 @@ def generate_mongo_sample_queries(metadata, construct=None, limit=3):
     patterns = mongo_query_patterns
     if construct:
         patterns = [pattern for pattern in patterns if construct.lower() in pattern["query"].lower()]
-
     for _ in range(limit):
         if not patterns:
             break  # No more unique patterns available
@@ -229,7 +222,7 @@ def generate_mongo_sample_queries(metadata, construct=None, limit=3):
         string_fields = [field for field in fields if field not in numeric_fields]
         date_fields = [field for field in fields if "date" in field]
 
-        placeholders = {
+        placeholders_mongo = {
             "collection": collection,
             "field": random.choice(fields),
             "numeric_field": random.choice(numeric_fields) if numeric_fields else random.choice(fields),
@@ -241,12 +234,12 @@ def generate_mongo_sample_queries(metadata, construct=None, limit=3):
         }
 
         # Skip queries that require a date field but none exist
-        if "{date_field}" in pattern.get("query", "") and not placeholders["date_field"]:
+        if "{date_field}" in pattern.get("query", "") and not placeholders_mongo["date_field"]:
             continue
 
         # Fill placeholders in the query
         try:
-            query = pattern["query"].format(**placeholders)
+            query = pattern["query"].format(**placeholders_mongo)
 
             # Create a human-readable description
             description_templates = {
@@ -256,7 +249,7 @@ def generate_mongo_sample_queries(metadata, construct=None, limit=3):
                 "top_n": "Find top 5 documents in {collection} sorted by {numeric_field} in descending order.",
             }
             description = description_templates.get(pattern["name"], pattern["description"]).format(
-                **placeholders
+                **placeholders_mongo
             )
 
             # Append the query and description to the results
@@ -270,9 +263,8 @@ def generate_mongo_sample_queries(metadata, construct=None, limit=3):
     return sample_queries
 
 
-
 # Process user input for generating sample queries
-def process_sample_queries(user_input, db_type, engine=None, metadata=None):
+def process_sample_queries(user_input, db_type, engine=None, metadata=None, db_name=None):
     """
     Process user input for generating sample queries.
 
@@ -291,7 +283,7 @@ def process_sample_queries(user_input, db_type, engine=None, metadata=None):
         if db_type == "SQL":
             metadata = fetch_sql_metadata(engine)
         elif db_type == "MongoDB":
-            metadata = fetch_mongo_metadata(engine)
+            metadata = fetch_mongo_metadata(db_name)
 
     if "with" in user_input:
         construct = user_input.split("with")[-1].strip()

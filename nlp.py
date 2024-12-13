@@ -14,9 +14,6 @@ def run_mongo_query(query, db_name):
 
 # Function to run a SQL query
 def run_sql_query(query, engine):
-    # with engine.connect() as connection:
-    #     result = connection.execute(text(query))
-    #     return result.fetchall()
     cursor = engine.cursor()
     res = []
     headers = None
@@ -30,12 +27,11 @@ def run_sql_query(query, engine):
     finally:
         cursor.close()
         return res, headers
-        # engine.close()
+    
 # Steps:
 # 1. Extract Parameters Dynamically: Use regex to extract parameters from the natural language input.
 # 2. Map Intent to the Query Pattern: Use the detected intent to choose the appropriate query template.
 # 3. Generate Queries Dynamically: Once parameters are extracted, use them to generate the query using the pattern's template depending on the database chosen (MongoDB or SQL).
-
 def process_user_input_sql(user_input, intent, engine):
 
     result = []
@@ -70,7 +66,6 @@ def process_user_input_sql(user_input, intent, engine):
         WHERE {params['table2']}.{params['column']} = '{params['value']}'
         """.strip()
         print("Generated Join Query:", query)
-        # Execute the query
         result = run_sql_query(query, engine)
     
     elif intent == "filter_by_date_range":

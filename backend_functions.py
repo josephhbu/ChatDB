@@ -2,15 +2,16 @@ import pandas as pd
 import mysql.connector
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
+import re
 
 # MySQL connection details
 MYSQL_USER = 'root'  # Default MySQL user created by Homebrew
 MYSQL_PASSWORD = ''  # No password set
 MYSQL_HOST = 'localhost'  # Default host
-DATABASE_NAME = 'db'
+DATABASE_NAME = 'chatDB'
 
-# Path to the data file
-FILE_PATH = 'data/SHOOTER.csv'
+# Path to the data files
+FILE_PATHS = ['data/INCIDENT.csv','data/SHOOTER.csv','data/VICTIM.csv']
 
 # Create a new MySQL database
 def create_database(cursor, db):
@@ -50,7 +51,7 @@ def insert_dataframe_into_mysql(df, table_name, engine):
     df.to_sql(table_name, con=engine, if_exists='append', index=False)
 
 # Main implementation
-def implement(table_name):
+def implement(file, table_name):
     # Connect to MySQL
     mydb = mysql.connector.connect(
         host=MYSQL_HOST,
@@ -64,10 +65,7 @@ def implement(table_name):
     cursor.close()
     mydb.close()
 
-    # Load the data file into a pandas DataFrame
-    df = load_file(FILE_PATH)
-
-    # Create a MySQL engine
+    df = load_file(file)
     engine = create_engine(f"mysql+mysqlconnector://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}/{DATABASE_NAME}")
 
     # Create a table based on the DataFrame
@@ -76,8 +74,17 @@ def implement(table_name):
     # Insert the data into the table
     insert_dataframe_into_mysql(df, table_name, engine)
 
-    print(f"Data from {FILE_PATH} has been successfully inserted into the database {DATABASE_NAME}.")
+    print(f"Data from {file} has been successfully inserted into the database {DATABASE_NAME}.")
+
 
 if __name__ == "__main__":
-    implement()
+    for file in FILE_PATHS:
+        table_name = ''
+        match = re.search(r'/([A-Z]+)\.csv$', file)
+        if match:
+            table_name = match.group(1).lower()
+        implement(file, table_name)
+
+    print(f"All files have been successfully inserted into the database {DATABASE_NAME}.")
+
 

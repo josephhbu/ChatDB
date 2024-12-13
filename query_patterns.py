@@ -57,71 +57,71 @@ sql_query_patterns = [
     }
 ]
 
-
 # MongoDB Patterns
 # Define all MongoDB query patterns
 mongo_query_patterns = [
     {
         "name": "mongo_group_sum",
-        "query": '[{{"$group": {{"_id": "${category}", "total": {{"$sum": "${measure}"}}}}}}]',
-        "description": "Total {measure} by {category} in MongoDB"
+        "query": '[{{"$group": {{"_id": "${field}", "total": {{"$sum": "${numeric_field}"}}}}}}]',
+        "description": "Calculate the total of {numeric_field} grouped by {field} in {collection}"
     },
     {
         "name": "mongo_filter_and_sort",
-        "query": '[{{"$match": {{"{condition}"}}}}, {{"$sort": {{"{sort_column}": {{"$direction": "{sort_order}"}}}}}}]',
-        "description": "Filter and sort MongoDB collection by {condition} and {sort_column}"
+        "query": '[{{"$match": {{"{field}": "{value}"}}}}, {{"$sort": {{"{field}": {{"$direction": "{sort_order}"}}}}}}]',
+        "description": "Filter and sort MongoDB collection by {field} and sort in {sort_order} order"
     },
     {
         "name": "mongo_count_by_category",
-        "query": '[{{"$group": {{"_id": "${category}", "count": {{"$sum": 1}}}}}}]',
-        "description": "Count documents by {category} in MongoDB"
+        "query": '[{{"$group": {{"_id": "${field}", "count": {{"$sum": 1}}}}}}]',
+        "description": "Count documents grouped by {field} in {collection}"
     },
     {
         "name": "mongo_average_by_category",
-        "query": '[{{"$group": {{"_id": "${category}", "average": {{"$avg": "${measure}"}}}}}}]',
-        "description": "Average {measure} by {category} in MongoDB"
+        "query": '[{{"$group": {{"_id": "${field}", "average": {{"$avg": "${numeric_field}"}}}}}}]',
+        "description": "Calculate the average of {numeric_field} grouped by {field} in {collection}"
     },
     {
         "name": "mongo_filter_by_date_range",
-        "query": '[{{"$match": {{"{date_column}": {{"$gte": "{start_date}", "$lte": "{end_date}"}}}}}}]',
-        "description": "Filter MongoDB collection by date range between {start_date} and {end_date}"
+        "query": '[{{"$match": {{"{date_field}": {{"$gte": "{start_date}", "$lte": "{end_date}"}}}}}}]',
+        "description": "Filter documents in {collection} where {date_field} is between {start_date} and {end_date}"
     },
     {
         "name": "mongo_top_n_by_measure",
-        "query": '[{{"$sort": {{"{measure}": -1}}}}, {{"$limit": {n}}}]',
-        "description": "Get top {n} results by {measure} in MongoDB"
+        "query": '[{{"$sort": {{"{numeric_field}": -1}}}}, {{"$limit": {n}}}]',
+        "description": "Retrieve top {n} documents in {collection} sorted by {numeric_field}"
     },
     {
         "name": "mongo_lookup",
-        "query": '[{{"$lookup": {{"from": "{table2}", "localField": "{local_field}", "foreignField": "{foreign_field}", "as": "{join_as}"}}}}]',
-        "description": "Join {table1} with {table2} on {local_field} and {foreign_field} in MongoDB"
+        "query": '[{{"$lookup": {{"from": "{table}", "localField": "{field}", "foreignField": "{field}", "as": "{join_as}"}}}}]',
+        "description": "Join {collection} with {table} on {field} in MongoDB"
     },
     {
         "name": "mongo_basic_select",
-        "query": '[{{"$match": {{"{condition}"}}}}]',
-        "description": "Basic MongoDB select query with condition {condition}"
+        "query": '[{{"$match": {{"{field}": "{value}"}}}}]',
+        "description": "Select documents from {collection} where {field} is {value}"
     },
     {
         "name": "mongo_insert_query",
-        "query": '[{{"$insert": {{"into": "{table}", "documents": {values}}}}}]',
-        "description": "Insert documents into {table} in MongoDB"
+        "query": '[{{"insert": "{collection}", "documents": [{value}]}}]',
+        "description": "Insert documents into {collection} in MongoDB"
     },
     {
         "name": "mongo_update_query",
-        "query": '[{{"$update": {{"table": "{table}", "set": "{columns}", "where": "{condition}"}}}}]',
-        "description": "Update {table} collection in MongoDB"
+        "query": '[{{"update": "{collection}", "updates": [{{"q": {{"{field}": "{value}"}}, "u": {{"$set": {columns}}}}]}}]',
+        "description": "Update documents in {collection} where {field} is {value}"
     },
     {
         "name": "mongo_delete_query",
-        "query": '[{{"$delete": {{"from": "{table}", "where": "{condition}"}}}}]',
-        "description": "Delete from {table} where {condition} in MongoDB"
+        "query": '[{{"delete": "{collection}", "deletes": [{{"q": {{"{field}": "{value}"}}, "limit": 1}}]}}]',
+        "description": "Delete documents from {collection} where {field} is {value}"
     },
     {
         "name": "mongo_list_collections",
-        "query": '[{{"$listCollections": {}}}]',
+        "query": 'db.getCollectionNames()',
         "description": "List all collections in MongoDB"
     }
 ]
+
 
 # Query pattern building
 # Class for a query pattern QueryPattern Class:
@@ -133,6 +133,8 @@ class QueryPattern:
         self.template = template   # SQL or MongoDB query template with placeholders
         self.description = description  # A brief description of what the query does
         # self.conditionclase = 
+
+
 # Class to manage multiple patterns and generate queries
 # This class manages a collection of query patterns.
 # You can add new query patterns to it.
@@ -161,9 +163,6 @@ class QueryGenerator:
 
 # Initialize the query generator
 generator = QueryGenerator()
-
-# Step 2: Add SQL patterns (can be used for different tables and columns)
-
 
 # Add MongoDB patterns to the generator
 for pattern in mongo_query_patterns:

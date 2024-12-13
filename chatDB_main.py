@@ -12,26 +12,11 @@ from query_patterns import generator
 from queries_suggestions import process_sample_queries
 from backend_functions import implement
 from nosql_backend import import_multiple_json_to_mongodb, csv_to_json
-from mongo_test import process_user_input_mongodb
-from Mongo_NLP import parse_query, execute_query
+from mongo_queries import process_user_input_mongodb
+from mongo_NLP import parse_query, execute_query
 
-# Initialize database connections
-sql_examples = [
-    "SELECT * FROM incident LIMIT 5;",
-    "SELECT state, COUNT(*) AS incident_count FROM incident GROUP BY state;",
-    "SELECT * FROM shooter WHERE gender = 'Male';",
-    "SELECT school, SUM(injuries) AS total_injuries FROM incident GROUP BY school;",
-    "SELECT * FROM victim WHERE race = 'Hispanic';",
-    "SELECT city, COUNT(*) AS total_incidents FROM incident GROUP BY city ORDER BY total_incidents DESC;",
-    "SELECT DISTINCT state FROM incident;",
-    "SELECT * FROM incident WHERE date BETWEEN '2020-01-01' AND '2021-01-01';",
-    "SELECT shooteroutcome, COUNT(*) AS total_shooters FROM shooter GROUP BY shooteroutcome;",
-    "SELECT school_level, AVG(age) AS average_age FROM victim GROUP BY school_level;"
-]
-mongodb_examples = [
-    "db.SHOOTER.aggregate([{'$lookup': {'from': 'VICTIM', 'localField': 'incidentid', 'foreignField': 'incidentid', 'as': 'victim_data'}}, {'$unwind': '$victim_data'}, {'$match': {'gender': {'$regex': '^male$', '$options': 'i'}, 'victim_data.gender': {'$regex': '^female$', '$options': 'i'}}}, {'$count': 'total'}])",
-    "",
-]
+sql_examples = []
+mongodb_examples = []
 
 def display_example_queries(db_type):
     if db_type == "SQL":
@@ -59,7 +44,7 @@ def get_mysql_connection():
             host="localhost",
             user="root",  # Update with your MySQL username
             password="",  # Update with your MySQL password
-            database="db"  # Replace with your database name
+            database="chatDB"  # Replace with your database name
         )
         if connection.is_connected():
             return connection
@@ -82,7 +67,6 @@ def main():
     db_type = st.sidebar.selectbox("Select Database Type", ["SQL", "MongoDB"])
     
     # Initialize database connections
-    # sql_engine = get_sql_engine() if db_type == "SQL" else None
     mysql_connection = get_mysql_connection() if db_type == "SQL" else None
     mongo_client = get_mongo_client() if db_type == "MongoDB" else None
 
@@ -97,10 +81,9 @@ def main():
             file_path = save_uploaded_file(uploaded_file)
             if db_type == "SQL":
                 st.subheader("SQL Database Operations")
-                # Use the implement function to process the uploaded file
                 if file_path.lower().endswith('.csv'):
-                    os.environ["IMPLEMENT_FILE_PATH"] = file_path  # Dynamically set the file path for the implement function
-                    implement(table_name)  # Run the existing SQL data upload function
+                    os.environ["IMPLEMENT_FILE_PATH"] = file_path  
+                    implement(file_path, table_name)  # Run the existing SQL data upload function
                     st.success(f"Dataset '{uploaded_file.name}' uploaded to SQL as table '{table_name}' successfully.")
                 else:
                     st.error("Unsupported file format. Please upload a CSV.")
@@ -110,7 +93,7 @@ def main():
                     json_file_path = f"{table_name}.json"
                     json_data = csv_to_json(file_path, json_file_path)
                     if json_data is not None:
-                        import_multiple_json_to_mongodb([json_file_path], "chatDB_test")
+                        import_multiple_json_to_mongodb([json_file_path], "chatDB")
                         st.success(f"CSV file '{uploaded_file.name}' converted and uploaded to MongoDB as collection '{table_name}' successfully.")
                     else:
                         st.error("Failed to convert CSV to JSON")
@@ -125,15 +108,14 @@ def main():
         
     # Example queries section
     if "example" in user_input.lower():
-        # display_example_queries(db_type)
         if db_type == "SQL":
             st.write("Here are some examples of SQL queries you can try:")
             result = process_sample_queries(user_input, db_type, engine=mysql_connection)
-        # else:
-        #     st.write("Here are some examples of MongoDB queries you can try:")
-        #     result = process_sample_queries(user_input, db_type, db_name='chatDB_test')
-        #     st.write(result)
-
+        else:
+            st.write("Here are some examples of MongoDB queries you can try:")
+            result = process_sample_queries(user_input, db_type, db_name='chatDB')
+            st.write(result)
+            
         for i, query in enumerate(result, 1):
             st.markdown(f"**{i}.** {query.get('description')}")
             st.code(query.get('query'), language="sql" if db_type == "SQL" else "json") 
@@ -159,13 +141,8 @@ def main():
                     st.warning("No results found or query failed.")
             elif db_type == "MongoDB":
                 # Process MongoDB query and display results
-                # mongo_query, result = process_user_input(user_input, db_type, engine=mongo_client)
-                # mongo_query, result = process_user_input_mongodb(user_input, db_name="chatDB_test")
                 user_query = parse_query(user_input)
                 result = execute_query(user_query)
-                # if mongo_query:
-                #     st.write("Generated MongoDB Query:")
-                #     st.code(mongo_query, language="json")
                 if result:  
                     mongo_query = result["query"]
                     res = result["result"]
