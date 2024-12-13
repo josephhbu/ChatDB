@@ -1,10 +1,11 @@
 import re
 from pymongo import MongoClient
 import ast
+import json
 
 # MongoDB setup
 client = MongoClient("mongodb://localhost:27017/")
-db = client["Shootings"]
+db = client["chatDB"]
 
 # Utility functions
 def parse_query(query):
@@ -39,58 +40,6 @@ def parse_query(query):
         "collection": "victim",  # Match the exact name of the collection
         "filter": {"injury": {"$regex": f"^{injury}$", "$options": "i"}}  # Case-insensitive match
         }
-
-    # match = re.match(r"how many victims were (over|under|between) (\d+)(?: and (\d+))?", query)
-    # if match:
-    #     condition, age1, age2 = match.groups()
-    #     age1 = int(age1)
-    #     age2 = int(age2) if age2 else None
-
-    #     # Handle "over" condition
-    #     if condition == "over":
-    #         return {
-    #         "operation": "count",
-    #         "collection": "victim",  # Lowercase collection name
-    #         "filter": {
-    #             "$and": [
-    #                 {"age": {"$exists": True, "$ne": ""}},  # Ensure `age` is non-empty
-    #                 {"$expr": {"$gt": [{"$toInt": "$age"}, age1]}}  # Dynamically convert `age` to int and compare
-    #                 ]
-    #             }
-    #         }
-
-    #     # Handle "under" condition
-    #     elif condition == "under":
-    #         return {
-    #         "operation": "count",
-    #         "collection": "victim",  # Lowercase collection name
-    #         "filter": {
-    #             "$and": [
-    #                 {"age": {"$exists": True, "$ne": ""}},  # Ensure `age` is non-empty
-    #                 {"$expr": {"$lt": [{"$toInt": "$age"}, age1]}}  # Dynamically convert `age` to int and compare
-    #                 ]
-    #             }
-    #         }
-
-    #     # Handle "between" condition
-    #     elif condition == "between":
-    #         if age2 is None:
-    #             raise ValueError("The 'between' condition requires two age values.")
-    #         return {
-    #         "operation": "count",
-    #         "collection": "victim",  # Lowercase collection name
-    #         "filter": {
-    #             "$and": [
-    #                 {"age": {"$exists": True, "$ne": ""}},  # Ensure `age` is non-empty
-    #                 {"$expr": {
-    #                     "$and": [
-    #                         {"$gte": [{"$toInt": "$age"}, age1]},  # Convert `age` to int and check >= age1
-    #                         {"$lte": [{"$toInt": "$age"}, age2]}   # Convert `age` to int and check <= age2
-    #                         ]
-    #                     }}
-    #                 ]
-    #             }
-    #         }
 
     # Query: Count incidents by location
     match = re.match(r"how many incidents occurred in (\w+)", query)
@@ -135,16 +84,41 @@ def is_mongo_query(query):
     except Exception:
         return False
 
+def is_mongo_query(query):
+    """
+    Check if the query is a valid MongoDB query.
+    
+    Returns:
+        bool: True if it's a valid MongoDB query, False otherwise.
+    """
+    query = query.strip()
+
+    # MongoDB queries typically start with "db.<collection>.<operation>"
+    if query.startswith("db."):
+        return True
+
+    try:
+        # Check if it's valid JSON
+        json.loads(query)
+        return True
+    except json.JSONDecodeError:
+        pass
+
+    # If none of the above checks pass, it's not a MongoDB query
+    return False
+
 def execute_query(parsed_query):
     if "error" in parsed_query:
-        return parsed_query["error"]
+        return {"query": None, "result": parsed_query["error"]}
 
     if parsed_query["operation"] == "show_collections":
-        return db.list_collection_names()
+        return {"query": "db.list_collection_names()", "result": db.list_collection_names()}
 
     if parsed_query["operation"] == "count":
         collection = db[parsed_query["collection"]]
-        return collection.count_documents(parsed_query["filter"])
+        mongo_query = f'db.{parsed_query["collection"]}.count_documents({parsed_query["filter"]})'
+        result = collection.count_documents(parsed_query["filter"])
+        return {"query": mongo_query, "result": result}
 
     if parsed_query["operation"] == "join_count":
         collection = db[parsed_query["collection"]]
@@ -154,18 +128,31 @@ def execute_query(parsed_query):
             {"$match": parsed_query["filter"]},
             {"$count": "total"}
         ]
+        mongo_query = f'db.{parsed_query["collection"]}.aggregate({pipeline})'
         result = list(collection.aggregate(pipeline))
-        return result[0]["total"] if result else 0
+        count_result = result[0]["total"] if result else 0
+        return {"query": mongo_query, "result": count_result}
 
     if parsed_query["operation"] == "raw_mongo":
         try:
-            # Evaluate the query safely using Python's literal_eval
-            raw_query = ast.literal_eval(parsed_query["query"])
-            collection_name = raw_query.pop("collection")
-            collection = db[collection_name]
-            return list(collection.find(raw_query))
+            # Extract the collection and operation from the raw query
+            raw_query = parsed_query["query"].strip()
+
+            # Extract collection and operation dynamically
+            if raw_query.startswith("db."):
+                collection_name = raw_query.split(".")[1]
+                command = raw_query.split(".", 2)[2]  # Operation and its parameters
+                collection = db[collection_name]
+
+                # Execute the operation dynamically
+                exec_result = eval(f"collection.{command}")
+                return {"query": raw_query, "result": list(exec_result) if hasattr(exec_result, "__iter__") else exec_result}
+
+            return {"query": None, "result": "Invalid MongoDB raw query format"}
         except Exception as e:
-            return f"Error executing raw MongoDB query: {str(e)}"
+            return {"query": None, "result": f"Error executing raw MongoDB query: {str(e)}"}
+
+    return {"query": None, "result": "Unsupported operation"}
 
 # Main loop
 def main():
