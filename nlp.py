@@ -1,6 +1,6 @@
 import re
 from query_patterns import generator
-from queries_suggestions import fetch_sql_metadata, fetch_mongo_metadata, process_sample_queries
+from query_suggestions import fetch_sql_metadata, fetch_mongo_metadata, process_sample_queries
 from sqlalchemy.sql import text
 from pymongo import MongoClient
 
