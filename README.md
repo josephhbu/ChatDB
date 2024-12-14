@@ -71,43 +71,55 @@
 3. **Ask for Example Queries**:
    - SQL
      - Ask for example queries in the input box
-       - This will output example queries for you to use. If you would like to run any of these, please copy and paste any of the **natural language queries** into the text box
+       - This will output example queries for you to use. If you would like to run any of these, please copy and paste any of the <ins>**natural language queries**</ins> into the text box
        - Example Input: "Can I get example queries"
-     - Ask for example queries with any of the following specific language constructs **(group by, order by, avg, sum, date, from, count)**
+     - Ask for example queries with any of the following specific language constructs <ins>**(group by, order by, avg, sum, date, from, count)**</ins>
        - Example Input: "Can I get example queries with group by" (replace "group by" with any of the specific language constructs above)
    - MongoDB
-     - Ask for example queries in the input box. If you would like to run any of these, please copy and paste the **actual MongoDB query** into the text box.
+     - Ask for example queries in the input box. If you would like to run any of these, please copy and paste the <ins>**actual MongoDB query**</ins> into the text box.
        - Example Input: "Can I get example queries"
 
 4. **Natural Language Queries**:
    Please input any of these natural language queries in quotation marks into the text box.
-   - SQL
+   - **SQL**
      - <ins>List Tables:</ins> "show tables"
      - <ins>Describe Attributes:</ins> "show table shooter attributes
      - <ins>Basic Select</ins>
        - "get me gender of shooter where race is Hispanic"
        - "get me incident where state is LA"
        - "get me victim where injury is Fatal "
-     - Total Group By
+     - <ins>Total Group By</ins>
        - "total Shots_Fired by state from incident"
-     - Count Group By
+     - <ins>Count Group By</ins>
        - "Count victim by injury"
        - "Count shooter by age"
-     - Joins
+     - <ins>Joins</ins>
        - "show incident which has shooter that the shooteroutcome is Surrendered"
        - "show victim which has incident that the city is Los Angeles"
        - After uploading weapon dataset: "show shooter which has weapon that the weapontype is Rifle"
-     - Filter Sort
+     - <ins>Filter Sort</ins>
        - "find gender, age from shooter where race is Hispanic order by age desc"
-     - Average Age By Category
+     - <ins>Average By Category</ins>
        - "average age by schoolaffiliation from shooter"
-       - "average  Shots_Fired by city from incident"
-     - Top N By Measure
+       - "average Shots_Fired by city from incident"
+     - <ins>Top N By Measure</ins>
        - "5 city with highest shots_fired"
        - "10 shooter with highest age"
        - "3 state with the highest number of incident"
-     - Filter By Date
+     - <ins>Filter By Date</ins>
        - "show incident where date is between '2022-05-30' and '2022-06-01"
+   - **MongoDB**
+     MongoDB supports less natural language queries, but supports all valid NoSQL queries.
+     - Natural Language
+       - <ins>List Collections:</ins> "show collections"
+       - "Count how many shooters are male" (male/female)
+       - "How many victims were wounded" (wounded/fatal
+       - "How many incidents occurred in CA" (any other abbreviated state)
+       - "How many incidents had a male shooter and a female victim" (male/female)
+     - NoSQL Queries
+       - db.shooter.aggregate([ {"$group": {"_id": "$gender", "total_age": {"$sum": "$age"}}} ])
+
+
 
 
 
