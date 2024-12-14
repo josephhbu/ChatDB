@@ -71,14 +71,21 @@
 3. **Ask for Example Queries**:
    - SQL
      - Ask for example queries in the input box
-       - This will output example queries for you to use. If you would like to run any of these, please copy and paste any of the *natural language queries* into the text box
-       - Example: "Can I get example queries"
+       - This will output example queries for you to use. If you would like to run any of these, please copy and paste any of the **natural language queries** into the text box
+       - Example Input: "Can I get example queries"
      - Ask for example queries with any of the following specific language constructs **(group by, order by, avg, sum, date, from, count)**
-       - Example: "Can I get example queries with group by" (replace "group by" with any of the specific language constructs above.
+       - Example Input: "Can I get example queries with group by" (replace "group by" with any of the specific language constructs above)
    - MongoDB
-     - Ask for example queries in the input box. If you would like to run any of these, please copy and paste the *actual MongoDB query* into the text box.
-       - Example:
-         - "Can I get example queries"
+     - Ask for example queries in the input box. If you would like to run any of these, please copy and paste the **actual MongoDB query** into the text box.
+       - Example Input: "Can I get example queries"
 
 4. **Natural Language Queries**:
-   - 
+   - SQL
+     - list tables: "show tables"
+     - descibe attributes: "show table <shooter> attributes
+     - Basic Select
+       - "get me gender of SHOOTER where race is Hispanic"
+       - "get me incident where state is LA"
+       - "get me victim where injury is Fatal "
+     - 
+   
