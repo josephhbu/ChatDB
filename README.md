@@ -80,14 +80,14 @@
        - Example Input: "Can I get example queries"
 
 4. **Natural Language Queries**:
-   Please input any of these natural language queries in quotation marks into the text box.
+   - Please input any of these natural language queries in quotation marks into the text box.
    - **SQL**
      - <ins>List Tables:</ins> "show tables"
-     - <ins>Describe Attributes:</ins> "show table shooter attributes
+     - <ins>Describe Attributes:</ins> "show table shooter attributes"
      - <ins>Basic Select</ins>
        - "get me gender of shooter where race is Hispanic"
        - "get me incident where state is LA"
-       - "get me victim where injury is Fatal "
+       - "get me victim where injury is Fatal"
      - <ins>Total Group By</ins>
        - "total Shots_Fired by state from incident"
      - <ins>Count Group By</ins>
@@ -109,7 +109,7 @@
      - <ins>Filter By Date</ins>
        - "show incident where date is between '2022-05-30' and '2022-06-01"
    - **MongoDB**
-     MongoDB supports less natural language queries, but supports all valid NoSQL queries.
+     - MongoDB supports less natural language queries, but supports all valid NoSQL queries.
      - Natural Language
        - <ins>List Collections:</ins> "show collections"
        - "Count how many shooters are male" (male/female)
@@ -118,6 +118,15 @@
        - "How many incidents had a male shooter and a female victim" (male/female)
      - NoSQL Queries
        - db.shooter.aggregate([ {"$group": {"_id": "$gender", "total_age": {"$sum": "$age"}}} ])
+       - db.shooter.aggregate([ {"$match": {"age": {"$gte": 30}}}, {"$group": {"_id": "$gender", "count": {"$sum": 1}}} ])
+       - db.victim.find().sort({"age": -1}).limit(5)
+       - db.victim.aggregate([    {"$group": {"_id": "$gender", "average_age": {"$avg": "$age"}}}])
+       - After uploading WEAPON.csv dataset with table name weapon:
+         - db.weapon.find({"weapontype": "Handgun"})
+         - db.weapon.find({}, {"incidentid": 1, "weapontype": 1, "_id": 0})
+
+
+
 
 
 
