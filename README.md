@@ -85,7 +85,7 @@
      - List Tables: "show tables"
      - Descibe Attributes: "show table <shooter> attributes
      - Basic Select
-       - "get me gender of SHOOTER where race is Hispanic"
+       - "get me gender of shooter where race is Hispanic"
        - "get me incident where state is LA"
        - "get me victim where injury is Fatal "
      - Total Group By
