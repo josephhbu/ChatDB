@@ -7,13 +7,13 @@ import pandas as pd
 import random
 import os
 
-from nlp import process_user_input
-from query_patterns import generator
-from query_suggestions import process_sample_queries
-from backend_functions import implement
-from nosql_backend import import_multiple_json_to_mongodb, csv_to_json
-from mongo_queries import process_user_input_mongodb
-from mongo_NLP import parse_query, execute_query
+from nlp_logic.nlp import process_user_input
+from nlp_logic.query_patterns import generator
+from nlp_logic.query_suggestions import process_sample_queries
+from backend.backend_functions import implement
+from backend.nosql_backend import import_multiple_json_to_mongodb, csv_to_json
+from nlp_logic.mongo_queries import process_user_input_mongodb
+from nlp_logic.mongo_NLP import parse_query, execute_query
 
 sql_examples = []
 mongodb_examples = []
