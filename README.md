@@ -80,12 +80,20 @@
        - Example Input: "Can I get example queries"
 
 4. **Natural Language Queries**:
+   Please input any of these natural language queries in quotation marks into the text box.
    - SQL
-     - list tables: "show tables"
-     - descibe attributes: "show table <shooter> attributes
+     - List Tables: "show tables"
+     - Descibe Attributes: "show table <shooter> attributes
      - Basic Select
        - "get me gender of SHOOTER where race is Hispanic"
        - "get me incident where state is LA"
        - "get me victim where injury is Fatal "
-     - 
-   
+     - Total Group By
+       - "total Shots_Fired by state from incident"
+     - Count Group By
+       - "Count victim by injury"
+       - "Count shooter by age"
+     - Joins
+       - "show incident which has shooter that the shooteroutcome is Surrendered"
+       - "show victim which has incident that the city is Los Angeles"
+       - "
