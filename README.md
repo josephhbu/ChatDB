@@ -82,9 +82,9 @@
 4. **Natural Language Queries**:
    Please input any of these natural language queries in quotation marks into the text box.
    - SQL
-     - List Tables: "show tables"
-     - Descibe Attributes: "show table shooter attributes
-     - Basic Select
+     - <ins>List Tables:</ins> "show tables"
+     - <ins>Describe Attributes:</ins> "show table shooter attributes
+     - <ins>Basic Select</ins>
        - "get me gender of shooter where race is Hispanic"
        - "get me incident where state is LA"
        - "get me victim where injury is Fatal "
