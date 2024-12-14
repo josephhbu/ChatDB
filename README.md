@@ -4,6 +4,24 @@
 
 ---
 
+## Project Directory Structure
+
+### `backend/`
+- **`backend_functions.py`**: Handles SQL database operations, including dataset upload, table creation, and data insertion.
+- **`nosql_backend.py`**: Handles MongoDB database operations, such as data insertion and collection management.
+
+### `nlp_logic/`
+- **`nlp.py`**: Core natural language processing logic for intent detection and parameter extraction.
+- **`query_patterns.py`**: Predefined templates for SQL and MongoDB query generation.
+- **`query_suggestions.py`**: Provides example queries for SQL and MongoDB.
+- **`mongo_nlp.py`**: MongoDB-specific natural language processing logic.
+- **`mongo_queries.py`**: Defines and executes MongoDB aggregation and filter queries.
+
+### Root Files
+- **`chatDB_main.py`**: Entry point for the Streamlit application, integrating the backend, nlp_logic, and frontend functionality.
+
+---
+
 ## Features
 
 - **Natural Language Querying**:
