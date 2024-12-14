@@ -83,7 +83,7 @@
    Please input any of these natural language queries in quotation marks into the text box.
    - SQL
      - List Tables: "show tables"
-     - Descibe Attributes: "show table <shooter> attributes
+     - Descibe Attributes: "show table shooter attributes
      - Basic Select
        - "get me gender of shooter where race is Hispanic"
        - "get me incident where state is LA"
@@ -96,4 +96,18 @@
      - Joins
        - "show incident which has shooter that the shooteroutcome is Surrendered"
        - "show victim which has incident that the city is Los Angeles"
-       - "
+       - After uploading weapon dataset: "show shooter which has weapon that the weapontype is Rifle"
+     - Filter Sort
+       - "find gender, age from shooter where race is Hispanic order by age desc"
+     - Average Age By Category
+       - "average age by schoolaffiliation from shooter"
+       - "average  Shots_Fired by city from incident"
+     - Top N By Measure
+       - "5 city with highest shots_fired"
+       - "10 shooter with highest age"
+       - "3 state with the highest number of incident"
+     - Filter By Date
+       - "show incident where date is between '2022-05-30' and '2022-06-01"
+
+
+
