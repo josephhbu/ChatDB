@@ -58,17 +58,17 @@
 ---
 
 ## Usage
-
 1. **Choose Database Type**:
+   - <ins>For best use please make sure to delete all input from textbox before switching database types</ins>
    - SQL
    - MongoDB
 
-2. **Upload Weapon Dataset**:
+3. **Upload Weapon Dataset**:
    - Choose data/WEAPON.csv
    - Enter table/collection name
    - Will upload dataset into either database
 
-3. **Ask for Example Queries**:
+4. **Ask for Example Queries**:
    - SQL
      - Ask for example queries in the input box
        - This will output example queries for you to use. If you would like to run any of these, please copy and paste any of the <ins>**natural language queries**</ins> into the text box
@@ -79,7 +79,7 @@
      - Ask for example queries in the input box. If you would like to run any of these, please copy and paste the <ins>**actual MongoDB query**</ins> into the text box.
        - Example Input: "Can I get example queries"
 
-4. **Natural Language Queries**:
+5. **Natural Language Queries**:
    - Please input any of these natural language queries in quotation marks into the text box.
    - **SQL**
      - <ins>List Tables:</ins> "show tables"
